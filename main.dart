@@ -179,20 +179,39 @@ String trBuyuk(String s) {
   return u + s.substring(1);
 }
 
-const Map<String, int> _sayiKelime = {
+const Map<String, int> _birler = {
+  'sıfır': 0,
   'bir': 1,
   'iki': 2,
   'üç': 3,
   'dört': 4,
+  'dörd': 4,
   'beş': 5,
   'altı': 6,
   'yedi': 7,
   'sekiz': 8,
   'dokuz': 9,
-  'on': 10,
-  'onbir': 11,
-  'oniki': 12,
 };
+const Map<String, int> _onlar = {
+  'on': 10,
+  'yirmi': 20,
+  'otuz': 30,
+  'kırk': 40,
+  'elli': 50,
+};
+const List<String> _ekListe = [
+  'de', 'da', 'te', 'ta', 'ye', 'ya', 'yi', 'yı', 'yu', 'yü', //
+  'e', 'a', 'i', 'ı', 'u', 'ü',
+];
+const Set<String> _uzunEk = {
+  'gibi',
+  'civarı',
+  'civarında',
+  'sularında',
+  'itibaren'
+};
+final Set<String> _ekSet = {..._ekListe, ..._uzunEk};
+const Set<String> _yerEk = {'de', 'da', 'te', 'ta'};
 const List<MapEntry<String, int>> _gunler = [
   MapEntry('pazartesi', 1),
   MapEntry('salı', 2),
@@ -202,6 +221,24 @@ const List<MapEntry<String, int>> _gunler = [
   MapEntry('cuma', 5),
   MapEntry('pazar', 7),
 ];
+const Set<String> _gunEkleri = {
+  '',
+  'ya',
+  'ye',
+  'a',
+  'e',
+  'yı',
+  'yi',
+  'ı',
+  'i',
+  'da',
+  'de',
+  'dan',
+  'den',
+  'nın',
+  'nin',
+  'günü'
+};
 const List<MapEntry<String, int>> _aylar = [
   MapEntry('ocak', 1),
   MapEntry('şubat', 2),
@@ -216,24 +253,107 @@ const List<MapEntry<String, int>> _aylar = [
   MapEntry('kasım', 11),
   MapEntry('aralık', 12),
 ];
-const Set<String> _ekler = {'de', 'da', 'te', 'ta', 'gibi', 'civarı', 'civarında'};
 const Set<String> _dolgu = {
   'bana',
+  'bize',
+  'beni',
   'lütfen',
   'hatırlat',
   'hatırlatır',
   'hatırlatsana',
   'hatırlatıcı',
-  'hatırla'
+  'hatırlatma',
+  'hatırla',
+  'unutma',
+  'diye',
+  'kur',
+  'ayarla',
+  'alarm',
+  'uyar',
+  'uyarı',
 };
-final RegExp _bitisikSaat = RegExp(
-    r'^(onbir|oniki|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on)(de|da|te|ta)$');
+const Set<String> _sayiDegil = {
+  'tane',
+  'adet',
+  'kilo',
+  'kg',
+  'lira',
+  'tl',
+  'gün',
+  'hafta',
+  'ay',
+  'dakika',
+  'dk',
+  'saat',
+  'kişi',
+  'metre',
+  'litre',
+  'paket',
+  'kutu',
+  'yıl',
+  'sene'
+};
+const Map<String, String> _bolumler = {
+  'sabah': 'sabah',
+  'sabahleyin': 'sabah',
+  'öğle': 'ogle',
+  'öğlen': 'ogle',
+  'öğleyin': 'ogle',
+  'akşam': 'aksam',
+  'akşamleyin': 'aksam',
+  'akşamüstü': 'aksam',
+  'gece': 'gece',
+  'geceleyin': 'gece',
+};
+const Set<String> _zamanBirim = {'dakika', 'dk', 'saat', 'gün', 'hafta', 'ay'};
+const Set<String> _sonraSozu = {'sonra', 'içinde', 'sonrasına'};
+const Set<String> _ayGunEki = {'inde', 'ında', 'unda', 'ünde', 'sinde', 'sında'};
 final RegExp _saatDk = RegExp(r'^(\d{1,2})[:.](\d{2})$');
 final RegExp _sayiRe = RegExp(r'^\d{1,2}$');
+final RegExp _rakamEk =
+    RegExp(r'^(\d{1,2}(?:[:.]\d{2})?)([a-zA-ZçğıöşüÇĞİÖŞÜ]+)$');
 
-int? _sayi(String t) {
-  if (_sayiRe.hasMatch(t)) return int.parse(t);
-  return _sayiKelime[t];
+class _Kok {
+  final int v;
+  final bool sx;
+  _Kok(this.v, this.sx);
+}
+
+class _Say {
+  final int v;
+  final int c;
+  final bool sx;
+  final bool kelime;
+  _Say(this.v, this.c, this.sx, this.kelime);
+}
+
+_Kok? _kokCoz(String t) {
+  if (_birler.containsKey(t)) return _Kok(_birler[t]!, false);
+  if (_onlar.containsKey(t)) return _Kok(_onlar[t]!, false);
+  for (final sf in _ekListe) {
+    if (t.length > sf.length && t.endsWith(sf)) {
+      final b = t.substring(0, t.length - sf.length);
+      if (_birler.containsKey(b)) return _Kok(_birler[b]!, true);
+      if (_onlar.containsKey(b)) return _Kok(_onlar[b]!, true);
+    }
+  }
+  return null;
+}
+
+_Say? _sayiOku(List<String> w, int i, List<bool> used) {
+  final n = w.length;
+  if (i >= n || used[i]) return null;
+  final t = w[i];
+  if (_sayiRe.hasMatch(t)) return _Say(int.parse(t), 1, false, false);
+  final r = _kokCoz(t);
+  if (r == null) return null;
+  if (r.v >= 10 && r.v % 10 == 0 && !r.sx && i + 1 < n && !used[i + 1]) {
+    final r2 = _kokCoz(w[i + 1]);
+    if (r2 != null && r2.v >= 1 && r2.v <= 9) {
+      return _Say(r.v + r2.v, 2, r2.sx, true);
+    }
+  }
+  return _Say(r.v, 1, r.sx, true);
 }
 
 Parsed parseTr(String raw, DateTime now) {
@@ -242,36 +362,38 @@ Parsed parseTr(String raw, DateTime now) {
   final glue = <bool>[];
   for (final p in temiz.split(RegExp(r'\s+'))) {
     if (p.isEmpty) continue;
-    final k = p.indexOf("'");
-    if (k > 0) {
-      orig.add(p.substring(0, k));
-      glue.add(false);
-      if (p.length > k + 1) {
-        orig.add(p.substring(k + 1));
-        glue.add(true);
-      }
-    } else if (k == 0) {
-      if (p.length > 1) {
-        orig.add(p.substring(1));
+    final parts = p.split("'");
+    for (int k = 0; k < parts.length; k++) {
+      final q = parts[k];
+      if (q.isEmpty) continue;
+      final m = k == 0 ? _rakamEk.firstMatch(q) : null;
+      if (m != null) {
+        orig.add(m.group(1)!);
         glue.add(false);
+        orig.add(m.group(2)!);
+        glue.add(true);
+      } else {
+        orig.add(q);
+        glue.add(k > 0);
       }
-    } else {
-      orig.add(p);
-      glue.add(false);
     }
   }
   final w = orig.map(trLower).toList();
   final n = w.length;
   final used = List<bool>.filled(n, false);
-  String nx(int i) => (i + 1 < n && !used[i + 1]) ? w[i + 1] : '';
+  String nx(int i, [int k = 1]) => (i + k < n && !used[i + k]) ? w[i + k] : '';
+  String pv(int i) => (i > 0 && !used[i - 1]) ? w[i - 1] : '';
 
   int? relMin;
   int? relDays;
+  int? relMonths;
   int? dayD;
   int? dayM;
   int? dayoff;
   int? wday;
   bool haftaya = false;
+  bool gelecek = false;
+  bool aySonu = false;
   String? period;
   int? hour;
   int minute = 0;
@@ -280,47 +402,99 @@ Parsed parseTr(String raw, DateTime now) {
   for (int i = 0; i < n; i++) {
     if (used[i]) continue;
     final t = w[i];
-    if (t == 'yarım' && i + 2 < n && w[i + 1] == 'saat' && w[i + 2] == 'sonra') {
+    if (t == 'yarım' && nx(i) == 'saat' && _sonraSozu.contains(nx(i, 2))) {
       relMin = 30;
       used[i] = used[i + 1] = used[i + 2] = true;
       continue;
     }
-    final k = _sayi(t);
-    if (k != null &&
-        i + 2 < n &&
-        (w[i + 1] == 'dakika' ||
-            w[i + 1] == 'dk' ||
-            w[i + 1] == 'saat' ||
-            w[i + 1] == 'gün' ||
-            w[i + 1] == 'hafta') &&
-        w[i + 2] == 'sonra') {
-      final u = w[i + 1];
-      if (u == 'dakika' || u == 'dk') {
-        relMin = k;
-      } else if (u == 'saat') {
-        relMin = k * 60;
-      } else if (u == 'gün') {
-        relDays = k;
-      } else {
-        relDays = k * 7;
-      }
+    if (t == 'çeyrek' && nx(i) == 'saat' && _sonraSozu.contains(nx(i, 2))) {
+      relMin = 15;
       used[i] = used[i + 1] = used[i + 2] = true;
       continue;
     }
-    if (k != null && k >= 1 && k <= 31 && i + 1 < n) {
-      for (final a in _aylar) {
-        if (w[i + 1].startsWith(a.key)) {
-          dayD = k;
-          dayM = a.value;
-          used[i] = used[i + 1] = true;
-          if (i + 2 < n && _ekler.contains(w[i + 2])) used[i + 2] = true;
-          break;
+    final r = _sayiOku(w, i, used);
+    if (r != null) {
+      int j = i + r.c;
+      bool half = false;
+      if (j + 1 < n &&
+          !used[j] &&
+          w[j] == 'buçuk' &&
+          (w[j + 1] == 'saat' ||
+              w[j + 1] == 'gün' ||
+              w[j + 1] == 'hafta' ||
+              w[j + 1] == 'ay')) {
+        half = true;
+        j++;
+      }
+      if (j + 1 < n && _zamanBirim.contains(w[j]) && _sonraSozu.contains(w[j + 1])) {
+        final u = w[j];
+        final val = r.v + (half ? 0.5 : 0.0);
+        if (u == 'dakika' || u == 'dk') {
+          relMin = val.toInt();
+        } else if (u == 'saat') {
+          relMin = (val * 60).toInt();
+        } else if (u == 'gün') {
+          relDays = val.toInt();
+        } else if (u == 'hafta') {
+          relDays = (val * 7).toInt();
+        } else {
+          relMonths = val.toInt();
+        }
+        for (int k = i; k <= j + 1; k++) {
+          used[k] = true;
+        }
+        continue;
+      }
+      if (r.v >= 1 && r.v <= 31 && j < n && !used[j]) {
+        for (final a in _aylar) {
+          if (w[j].startsWith(a.key)) {
+            dayD = r.v;
+            dayM = a.value;
+            for (int k = i; k <= j; k++) {
+              used[k] = true;
+            }
+            if (j + 1 < n && _ekSet.contains(w[j + 1]) && glue[j + 1]) {
+              used[j + 1] = true;
+            }
+            break;
+          }
         }
       }
     }
   }
 
-  // 2) gün ve günün bölümü sözcükleri
+  // 2) ayın günü: "ayın 25'inde", "25'inde", "ayın sonunda"
+  for (int i = 0; i < n; i++) {
+    if (used[i] || dayD != null) continue;
+    final t = w[i];
+    if ((t == 'ayın' || t == 'ay') && (nx(i) == 'sonu' || nx(i) == 'sonunda')) {
+      aySonu = true;
+      used[i] = used[i + 1] = true;
+      continue;
+    }
+    if (t == 'ayın') {
+      final r = _sayiOku(w, i + 1, used);
+      if (r != null && r.v >= 1 && r.v <= 31) {
+        dayD = r.v;
+        used[i] = true;
+        for (int k = i + 1; k <= i + r.c; k++) {
+          used[k] = true;
+        }
+        final e = i + 1 + r.c;
+        if (e < n && glue[e]) used[e] = true;
+        continue;
+      }
+    }
+    if (_sayiRe.hasMatch(t) &&
+        _ayGunEki.contains(nx(i)) &&
+        int.parse(t) >= 1 &&
+        int.parse(t) <= 31) {
+      dayD = int.parse(t);
+      used[i] = used[i + 1] = true;
+    }
+  }
+
+  // 3) gün ve günün bölümü sözcükleri
   for (int i = 0; i < n; i++) {
     if (used[i]) continue;
     final t = w[i];
@@ -339,28 +513,39 @@ Parsed parseTr(String raw, DateTime now) {
     } else if (t == 'haftaya') {
       haftaya = true;
       used[i] = true;
+    } else if ((t == 'gelecek' || t == 'önümüzdeki') && nx(i) == 'hafta') {
+      haftaya = true;
+      used[i] = used[i + 1] = true;
+    } else if (t == 'gelecek' || t == 'önümüzdeki') {
+      gelecek = true;
+      used[i] = true;
     } else if (t == 'bu' &&
-        (nx(i) == 'akşam' || nx(i) == 'gece' || nx(i) == 'sabah')) {
-      dayoff = 0;
+        (_bolumler.containsKey(nx(i)) ||
+            nx(i) == 'hafta' ||
+            _gunler.any((g) => nx(i).startsWith(g.key)))) {
+      if (_bolumler.containsKey(nx(i))) dayoff = 0;
+      if (nx(i) == 'hafta') used[i + 1] = true;
       used[i] = true;
     } else if (t == 'öğleden' && nx(i) == 'sonra') {
       period = 'ogleden';
       used[i] = used[i + 1] = true;
-    } else if (t == 'öğle' || t == 'öğlen') {
-      period = 'ogle';
-      used[i] = true;
-    } else if (t == 'akşam' || t == 'akşamüstü') {
-      period = 'aksam';
-      used[i] = true;
-    } else if (t == 'sabah') {
+    } else if (t == 'öğleden' && nx(i) == 'önce') {
       period = 'sabah';
+      used[i] = used[i + 1] = true;
+    } else if (t == 'sabaha' && nx(i) == 'karşı') {
+      period = 'sabaha';
+      used[i] = used[i + 1] = true;
+    } else if (_bolumler.containsKey(t)) {
+      period = _bolumler[t];
       used[i] = true;
-    } else if (t == 'gece') {
-      period = 'gece';
+    } else if (t.startsWith('akşam') && t.length <= 8) {
+      period = 'aksam';
       used[i] = true;
     } else {
       for (final g in _gunler) {
-        if (t == g.key) {
+        if (t.startsWith(g.key) &&
+            _gunEkleri.contains(t.substring(g.key.length)) &&
+            !(g.key == 'pazar' && t != 'pazar' && t != 'pazarı')) {
           wday = g.value;
           used[i] = true;
           if (nx(i) == 'günü' || nx(i) == 'gün') used[i + 1] = true;
@@ -370,40 +555,131 @@ Parsed parseTr(String raw, DateTime now) {
     }
   }
 
-  // 3) saat
+  // 4) saat
   for (int i = 0; i < n; i++) {
-    if (used[i] || hour != null) continue;
+    if (hour != null) break;
+    if (used[i]) continue;
     final t = w[i];
     final m = _saatDk.firstMatch(t);
-    final g = _bitisikSaat.firstMatch(t);
-    final k = _sayi(t);
-    if (m != null && int.parse(m.group(1)!) < 24 && int.parse(m.group(2)!) < 60) {
-      hour = int.parse(m.group(1)!);
-      minute = int.parse(m.group(2)!);
-      used[i] = true;
-    } else if (g != null) {
-      hour = _sayiKelime[g.group(1)!];
-      used[i] = true;
-    } else if (k != null &&
-        k <= 24 &&
-        ((i > 0 && w[i - 1] == 'saat') ||
-            _ekler.contains(nx(i)) ||
-            nx(i).startsWith('buçuk'))) {
-      hour = k;
-      used[i] = true;
-      if (nx(i).startsWith('buçuk')) {
-        minute = 30;
-        used[i + 1] = true;
-      }
+    int hh;
+    int mm = 0;
+    int c = 1;
+    bool sx = false;
+    bool kelime = false;
+    final saatMi = m != null && int.parse(m.group(1)!) < 24 && int.parse(m.group(2)!) < 60;
+    if (saatMi) {
+      hh = int.parse(m.group(1)!);
+      mm = int.parse(m.group(2)!);
     } else {
-      continue;
+      final r = _sayiOku(w, i, used);
+      if (r == null) continue;
+      if (r.v > 24) continue;
+      c = r.c;
+      sx = r.sx;
+      kelime = r.kelime;
+      final j0 = i + c;
+      final nxt = (j0 < n && !used[j0]) ? w[j0] : '';
+      final p = pv(i);
+      final pw = i > 0 ? w[i - 1] : '';
+      final oncekiKullanildi = i > 0 && used[i - 1];
+      bool ctx = p == 'saat' ||
+          sx ||
+          (_ekSet.contains(nxt) && j0 < n && glue[j0]) ||
+          nxt.startsWith('buçuk') ||
+          nxt == 'çeyrek' ||
+          (oncekiKullanildi &&
+              !_sayiDegil.contains(nxt) &&
+              nxt != 'gün' &&
+              nxt != 'hafta');
+      if (r.v == 10 && kelime && c == 1) {
+        final saatOnce = pw == 'saat';
+        final bolumOnce = _bolumler.containsKey(pw);
+        if (sx && !(saatOnce || bolumOnce)) ctx = false;
+        if (!sx &&
+            !(saatOnce || bolumOnce || (_ekSet.contains(nxt) && j0 < n && glue[j0]))) {
+          ctx = false;
+        }
+      }
+      if (!ctx) continue;
+      if (_sayiDegil.contains(nxt) && nxt != 'saat') continue;
+      hh = r.v;
+      mm = 0;
     }
-    if (i > 0 && w[i - 1] == 'saat') used[i - 1] = true;
-    int j = i;
-    while (j + 1 < n && !used[j + 1] && _ekler.contains(w[j + 1])) {
-      used[j + 1] = true;
+    int j = i + c;
+    used[i] = true;
+    for (int k = 1; k < c; k++) {
+      used[i + k] = true;
+    }
+    if (i > 0 && w[i - 1] == 'saat' && !used[i - 1]) used[i - 1] = true;
+    while (j < n &&
+        !used[j] &&
+        ((glue[j] && _ekSet.contains(w[j])) ||
+            (_yerEk.contains(w[j]) && _sayiRe.hasMatch(orig[j - 1])))) {
+      used[j] = true;
       j++;
     }
+    String nxj(int k) => (j + k < n && !used[j + k]) ? w[j + k] : '';
+    if (mm == 0) {
+      if (nxj(0).startsWith('buçuk')) {
+        mm = 30;
+        used[j] = true;
+        j++;
+      } else if (nxj(0) == 'çeyrek' && nxj(1) == 'var') {
+        hh = (hh - 1 + 24) % 24;
+        mm = 45;
+        used[j] = used[j + 1] = true;
+        j += 2;
+      } else if (nxj(0) == 'çeyrek' && (nxj(1) == 'geçe' || nxj(1) == 'geçiyor')) {
+        mm = 15;
+        used[j] = used[j + 1] = true;
+        j += 2;
+      } else {
+        final r2 = _sayiOku(w, j, used);
+        if (r2 != null && r2.v >= 0 && r2.v <= 59) {
+          final sonraki = j + r2.c < n ? w[j + r2.c] : '';
+          if (sonraki == 'geçe') {
+            mm = r2.v;
+            for (int k = j; k <= j + r2.c; k++) {
+              used[k] = true;
+            }
+            j += r2.c + 1;
+          } else if (sonraki == 'var') {
+            hh = (hh - 1 + 24) % 24;
+            mm = 60 - r2.v;
+            for (int k = j; k <= j + r2.c; k++) {
+              used[k] = true;
+            }
+            j += r2.c + 1;
+          } else {
+            final saatli = i > 0 && w[i - 1] == 'saat';
+            final ikiKelime = !saatMi && kelime && r2.kelime;
+            if ((saatli || ikiKelime) &&
+                r2.v % 5 == 0 &&
+                !glue[j] &&
+                !(j + r2.c < n && _sayiDegil.contains(w[j + r2.c]))) {
+              mm = r2.v;
+              for (int k = j; k < j + r2.c; k++) {
+                used[k] = true;
+              }
+              j += r2.c;
+            }
+          }
+        }
+      }
+    }
+    while (j < n &&
+        !used[j] &&
+        _ekSet.contains(w[j]) &&
+        (glue[j] || _uzunEk.contains(w[j]))) {
+      used[j] = true;
+      j++;
+    }
+    hour = hh;
+    minute = mm;
+  }
+
+  for (int i = 1; i < n; i++) {
+    if (w[i] == 'kadar' && !used[i] && used[i - 1]) used[i] = true;
   }
 
   // başlık
@@ -420,6 +696,10 @@ Parsed parseTr(String raw, DateTime now) {
     }
     oncekiKaldi = keep;
   }
+  while (words.length > 1 &&
+      (trLower(words[0]) == 'şunu' || trLower(words[0]) == 'şey')) {
+    words.removeAt(0);
+  }
   if (words.length > 1 && trLower(words.last) == 'için') words.removeLast();
   final title = words.isEmpty ? 'Hatırlatıcı' : trBuyuk(words.join(' '));
 
@@ -430,15 +710,29 @@ Parsed parseTr(String raw, DateTime now) {
     return Parsed(title, DateTime(t.year, t.month, t.day, t.hour, t.minute));
   }
   DateTime? date;
-  if (relDays != null) {
+  if (relMonths != null) {
+    final mo = today.month - 1 + relMonths;
+    date = DateTime(today.year + mo ~/ 12, mo % 12 + 1, min(today.day, 28));
+  } else if (relDays != null) {
     date = gunEkle(today, relDays);
   } else if (dayD != null && dayM != null) {
-    date = DateTime(now.year, dayM, dayD);
+    final dd = DateTime(now.year, dayM, dayD);
+    date = dd.month == dayM ? dd : null;
+  } else if (dayD != null) {
+    int y = today.year;
+    int mo = today.month;
+    if (dayD < today.day) mo++;
+    final dd = DateTime(y, mo, dayD);
+    date = dd.day == dayD ? dd : null;
+  } else if (aySonu) {
+    date = DateTime(today.year, today.month + 1, 0);
   } else if (wday != null) {
     if (haftaya) {
       date = gunEkle(today, -(today.weekday - 1) + 7 + wday - 1);
     } else {
-      date = gunEkle(today, (wday - today.weekday + 7) % 7);
+      int d = (wday - today.weekday + 7) % 7;
+      if (gelecek && d == 0) d = 7;
+      date = gunEkle(today, d);
     }
   } else if (dayoff != null) {
     date = gunEkle(today, dayoff);
@@ -453,6 +747,7 @@ Parsed parseTr(String raw, DateTime now) {
     hh = 9;
     mm = 0;
   } else if (hour == null) {
+    mm = 0;
     switch (period) {
       case 'sabah':
         hh = 9;
@@ -466,10 +761,12 @@ Parsed parseTr(String raw, DateTime now) {
       case 'aksam':
         hh = 19;
         break;
+      case 'sabaha':
+        hh = 6;
+        break;
       default:
         hh = 22;
     }
-    mm = 0;
   } else {
     hh = hour;
     mm = minute;
@@ -497,7 +794,9 @@ Parsed parseTr(String raw, DateTime now) {
         cand.add(const Duration(hours: 12)).isAfter(now)) {
       cand = cand.add(const Duration(hours: 12));
     }
-    if (!cand.isAfter(now)) cand = DateTime(cand.year, cand.month, cand.day + 1, hh, mm);
+    if (!cand.isAfter(now)) {
+      cand = DateTime(cand.year, cand.month, cand.day + 1, hh, mm);
+    }
     return Parsed(title, cand);
   }
   var cand = DateTime(date.year, date.month, date.day, hh, mm);
@@ -507,8 +806,14 @@ Parsed parseTr(String raw, DateTime now) {
         wday == null &&
         cand.add(const Duration(hours: 12)).isAfter(now)) {
       cand = cand.add(const Duration(hours: 12));
+    } else if (gunFarki(date, now) == 0 && period == 'gece' && hh < 6) {
+      cand = DateTime(cand.year, cand.month, cand.day + 1, hh, mm);
     } else if (wday != null && !haftaya) {
       cand = DateTime(cand.year, cand.month, cand.day + 7, hh, mm);
+    } else if (dayD != null && dayM == null) {
+      final dd = DateTime(cand.year, cand.month + 1, cand.day, hh, mm);
+      if (dd.day != cand.day) return Parsed(title, null);
+      cand = dd;
     } else if (dayD != null) {
       cand = DateTime(cand.year + 1, cand.month, cand.day, hh, mm);
     } else {
