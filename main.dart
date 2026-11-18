@@ -898,8 +898,6 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
 
   Future<void> _calDialog(Hat h) async {
     _dialogAcik = true;
-    await alarmDurdur(h.id);
-    await konus('Hatırlatma. ${h.title}');
     if (!mounted) {
       _dialogAcik = false;
       return;
@@ -909,8 +907,13 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       barrierDismissible: false,
       builder: (c) => AlertDialog(
         icon: const Icon(Icons.alarm, size: 40),
-        title: Text(h.title, textAlign: TextAlign.center),
-        content: Text('Saat ${hhmm(h.when)}', textAlign: TextAlign.center),
+        title: Text(
+          h.title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+        ),
+        content: Text('Saat ${hhmm(h.when)}',
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
@@ -924,9 +927,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         ],
       ),
     );
-    try {
-      await tts.stop();
-    } catch (_) {}
+    await alarmDurdur(h.id);
     if (secim == 'tamam') {
       await _bitti(h, true);
     } else if (secim == 'ertele') {
