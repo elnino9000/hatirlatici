@@ -977,11 +977,17 @@ Future<void> alarmDurdur(int id) async {
   } catch (_) {}
 }
 
+Future<void> bildirimIptal(int id) async {
+  try {
+    await plugin.cancel(id);
+  } catch (_) {}
+}
+
 Future<void> iptalHat(int id) async {
   await alarmDurdur(id);
-  await plugin.cancel(id * 10 + 1);
-  await plugin.cancel(id * 10 + 2);
-  await plugin.cancel(id * 10 + 3);
+  await bildirimIptal(id * 10 + 1);
+  await bildirimIptal(id * 10 + 2);
+  await bildirimIptal(id * 10 + 3);
 }
 
 Future<void> kurHat(Hat h) async {
@@ -989,7 +995,7 @@ Future<void> kurHat(Hat h) async {
     await iptalHat(h.id);
     return;
   }
-  await plugin.cancel(h.id * 10 + 2);
+  await bildirimIptal(h.id * 10 + 2);
   if (h.when.isAfter(DateTime.now())) {
     await alarmDurdur(h.id);
     await alm.Alarm.set(alarmSettings: alarmAyari(h.id, h.when, h.title));
