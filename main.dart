@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:alarm/alarm.dart' as alm;
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -643,16 +644,51 @@ Future<void> zamanla(
   }
 }
 
+alm.AlarmSettings alarmAyari(int id, DateTime when, String baslik) {
+  return alm.AlarmSettings(
+    id: id,
+    dateTime: when,
+    assetAudioPath: 'assets/alarm.wav',
+    loopAudio: true,
+    vibrate: true,
+    warningNotificationOnKill: false,
+    androidFullScreenIntent: true,
+    volumeSettings: alm.VolumeSettings.fade(
+      volume: 0.9,
+      fadeDuration: const Duration(seconds: 3),
+      volumeEnforced: false,
+    ),
+    notificationSettings: alm.NotificationSettings(
+      title: baslik,
+      body: 'Hatırlatma zamanı',
+      stopButton: 'Durdur',
+    ),
+  );
+}
+
+Future<void> alarmDurdur(int id) async {
+  try {
+    await alm.Alarm.stop(id);
+  } catch (_) {}
+}
+
 Future<void> iptalHat(int id) async {
+  await alarmDurdur(id);
   await plugin.cancel(id * 10 + 1);
   await plugin.cancel(id * 10 + 2);
   await plugin.cancel(id * 10 + 3);
 }
 
 Future<void> kurHat(Hat h) async {
-  await iptalHat(h.id);
-  if (h.done) return;
-  await zamanla(h.id * 10 + 1, h.id, h.title, h.when, alarm: true);
+  if (h.done) {
+    await iptalHat(h.id);
+    return;
+  }
+  await plugin.cancel(h.id * 10 + 2);
+  if (h.when.isAfter(DateTime.now())) {
+    await alarmDurdur(h.id);
+    await alm.Alarm.set(alarmSettings: alarmAyari(h.id, h.when, h.title));
+  }
   if (h.early) {
     final w = h.when;
     final e = DateTime(w.year, w.month, w.day - 1, 20, 0);
@@ -720,6 +756,7 @@ Future<void> yanitIsle(NotificationResponse r, {required bool fg}) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initNotifications();
+  await alm.Alarm.init();
   await initTts();
   runApp(const HatApp());
 }
@@ -774,7 +811,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     yenileSinyali.addListener(_yukle);
     _baslat();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _nabiz());
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _nabiz());
   }
 
   @override
@@ -790,6 +827,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _yukle();
       _saglikKontrol();
+      _nabiz();
     }
   }
 
@@ -837,21 +875,75 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  // Uygulama açıkken zamanı gelen hatırlatmayı sesli oku
+  bool _dialogAcik = false;
+
+  // Zamanı gelen hatırlatmayı sesli oku ve ekranda göster
   Future<void> _nabiz() async {
     await _yukle();
+    if (_dialogAcik || !mounted) return;
     final now = DateTime.now();
     for (final h in items) {
       if (h.done) continue;
       final fark = now.difference(h.when);
       final anahtar = '${h.id}-${h.whenMs}';
       if (!fark.isNegative &&
-          fark < const Duration(minutes: 2) &&
+          fark < const Duration(minutes: 3) &&
           !_okundu.contains(anahtar)) {
         _okundu.add(anahtar);
-        await konus('Hatırlatma. ${h.title}');
+        await _calDialog(h);
+        break;
       }
     }
+  }
+
+  Future<void> _calDialog(Hat h) async {
+    _dialogAcik = true;
+    await alarmDurdur(h.id);
+    await konus('Hatırlatma. ${h.title}');
+    if (!mounted) {
+      _dialogAcik = false;
+      return;
+    }
+    final secim = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.alarm, size: 40),
+        title: Text(h.title, textAlign: TextAlign.center),
+        content: Text('Saat ${hhmm(h.when)}', textAlign: TextAlign.center),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(c).pop('ertele'),
+            child: const Text('10 dk ertele'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(c).pop('tamam'),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+    try {
+      await tts.stop();
+    } catch (_) {}
+    if (secim == 'tamam') {
+      await _bitti(h, true);
+    } else if (secim == 'ertele') {
+      final l = await Store.load();
+      final k = l.indexWhere((e) => e.id == h.id);
+      if (k >= 0) {
+        l[k].whenMs =
+            DateTime.now().add(const Duration(minutes: 10)).millisecondsSinceEpoch;
+        l[k].done = false;
+        await Store.save(l);
+        try {
+          await kurHat(l[k]);
+        } catch (_) {}
+        if (mounted) setState(() => items = l);
+      }
+    }
+    _dialogAcik = false;
   }
 
   Future<void> _mikrofon() async {
@@ -1705,40 +1797,41 @@ class _KurulumPenceresiState extends State<KurulumPenceresi>
               width: double.infinity,
               child: FilledButton.icon(
                 icon: const Icon(Icons.volume_up),
-                label: const Text('Şimdi çal (hemen dene)'),
+                label: const Text('Dene: 6 saniye sonra alarm çalsın'),
                 onPressed: () async {
                   final nav = ScaffoldMessenger.of(context);
                   try {
-                    await plugin.show(999998, 'Deneme', 'Hemen gösterilen bildirim',
-                        alarmDetails(), payload: '0|Deneme');
+                    await alarmDurdur(999998);
+                    await alm.Alarm.set(
+                      alarmSettings: alarmAyari(
+                        999998,
+                        DateTime.now().add(const Duration(seconds: 6)),
+                        'Deneme hatırlatması',
+                      ),
+                    );
                   } catch (e) {
                     nav.showSnackBar(SnackBar(content: Text('Hata: $e')));
+                    return;
                   }
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.notifications_active_outlined),
-                label: const Text('Dene: 15 saniye sonra çalsın'),
-                onPressed: () async {
-                  final nav = ScaffoldMessenger.of(context);
-                  try {
-                    await zamanla(
-                      999999,
-                      0,
-                      'Deneme hatırlatması',
-                      DateTime.now().add(const Duration(seconds: 15)),
-                      alarm: true,
-                    );
-                    nav.showSnackBar(const SnackBar(
-                        content: Text(
-                            'Kuruldu. Ekranı kilitleyip bekle, çalıyor mu bak.')));
-                  } catch (e) {
-                    nav.showSnackBar(SnackBar(content: Text('Kurulamadı: $e')));
-                  }
+                  if (!mounted) return;
+                  await showDialog<void>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (c) => AlertDialog(
+                      title: const Text('Alarm 6 saniye sonra çalacak'),
+                      content: const Text(
+                          'Telefonu sessizde bırak. Çalınca aşağıdaki tuşla durdur.'),
+                      actions: [
+                        FilledButton(
+                          onPressed: () async {
+                            await alarmDurdur(999998);
+                            if (c.mounted) Navigator.of(c).pop();
+                          },
+                          child: const Text('Durdur'),
+                        ),
+                      ],
+                    ),
+                  );
                 },
               ),
             ),

@@ -28,7 +28,7 @@ jobs:
           import re, pathlib
           mp = pathlib.Path('android/app/src/main/AndroidManifest.xml')
           m = mp.read_text(encoding='utf-8')
-          names = ['POST_NOTIFICATIONS','SCHEDULE_EXACT_ALARM','USE_EXACT_ALARM','RECEIVE_BOOT_COMPLETED','VIBRATE','USE_FULL_SCREEN_INTENT','WAKE_LOCK','RECORD_AUDIO','INTERNET']
+          names = ['POST_NOTIFICATIONS','SCHEDULE_EXACT_ALARM','USE_EXACT_ALARM','RECEIVE_BOOT_COMPLETED','VIBRATE','USE_FULL_SCREEN_INTENT','WAKE_LOCK','RECORD_AUDIO','INTERNET','FOREGROUND_SERVICE','FOREGROUND_SERVICE_MEDIA_PLAYBACK']
           perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in names)
           q = '<intent><action android:name="android.speech.RecognitionService"/></intent>\n        <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>\n    '
           if '</queries>' in m:
