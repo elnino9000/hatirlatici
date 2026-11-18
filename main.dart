@@ -1494,6 +1494,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _duzenle(baslik: h.title, zaman: h.when, mevcut: h),
+            onLongPress: () => _sil(h),
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1692,7 +1693,21 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
   }
 
   Widget _hero(Hat h, DateTime now) {
-    return GestureDetector(
+    return Dismissible(
+      key: ValueKey('hero${h.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+        decoration: BoxDecoration(
+          color: kKirmizi.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 30),
+        child: const Icon(Icons.delete_outline, color: kKirmizi, size: 30),
+      ),
+      onDismissed: (_) => _sil(h),
+      child: GestureDetector(
       onTap: () => _duzenle(baslik: h.title, zaman: h.when, mevcut: h),
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 14, 16, 4),
@@ -1722,6 +1737,19 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
                     letterSpacing: 1.4,
                     fontWeight: FontWeight.w700,
                     color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _sil(h),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.white, size: 20),
                   ),
                 ),
               ],
@@ -1769,6 +1797,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
             ),
           ],
         ),
+      ),
       ),
     );
   }
