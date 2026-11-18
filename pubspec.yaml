@@ -1,0 +1,22 @@
+name: hatirlatici
+description: Sesli hatirlatici
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_local_notifications: ^17.2.4
+  timezone: ^0.9.4
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+  shared_preferences: ^2.2.0
+  android_intent_plus: ^5.2.0
+
+flutter:
+  uses-material-design: true
