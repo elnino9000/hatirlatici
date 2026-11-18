@@ -25,6 +25,35 @@ final FlutterLocalNotificationsPlugin plugin = FlutterLocalNotificationsPlugin()
 final FlutterTts tts = FlutterTts();
 final ValueNotifier<int> yenileSinyali = ValueNotifier<int>(0);
 
+const kArka = Color(0xFF0A0E1F);
+const kYuzey = Color(0xFF151A33);
+const kYuzey2 = Color(0xFF1E2550);
+const kMor = Color(0xFF7C5CFF);
+const kMavi = Color(0xFF3D8BFF);
+const kYesil = Color(0xFF2EE6A6);
+const kSari = Color(0xFFFFB84D);
+const kKirmizi = Color(0xFFFF5C6C);
+const kGri = Color(0xFF6B7299);
+const kSoluk = Color(0xFF8E96C7);
+const kGradyan = LinearGradient(
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+  colors: [kMor, kMavi],
+);
+const _ayTam = [
+  'Ocak',
+  'Şubat',
+  'Mart',
+  'Nisan',
+  'Mayıs',
+  'Haziran',
+  'Temmuz',
+  'Ağustos',
+  'Eylül',
+  'Ekim',
+  'Kasım',
+  'Aralık'
+];
 const _gunKisa = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 const _gunTam = [
   'Pazartesi',
@@ -1072,6 +1101,49 @@ Future<void> main() async {
   runApp(const HatApp());
 }
 
+ThemeData _tema() {
+  final cs = ColorScheme.fromSeed(
+    seedColor: kMor,
+    brightness: Brightness.dark,
+  );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: cs,
+    scaffoldBackgroundColor: kArka,
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: kYuzey,
+      showDragHandle: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: kYuzey2,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: kMor,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 52),
+        side: const BorderSide(color: Color(0xFF39407A)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+    ),
+  );
+}
+
 class HatApp extends StatelessWidget {
   const HatApp({super.key});
 
@@ -1087,17 +1159,9 @@ class HatApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF3F51B5),
-        brightness: Brightness.light,
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF3F51B5),
-        brightness: Brightness.dark,
-      ),
-      themeMode: ThemeMode.system,
+      theme: _tema(),
+      darkTheme: _tema(),
+      themeMode: ThemeMode.dark,
       home: const AnaSayfa(),
     );
   }
@@ -1217,7 +1281,9 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: false,
       builder: (c) => AlertDialog(
-        icon: const Icon(Icons.alarm, size: 40),
+        backgroundColor: kYuzey,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        icon: const Icon(Icons.alarm, size: 44, color: kSari),
         title: Text(
           h.title,
           textAlign: TextAlign.center,
@@ -1382,42 +1448,141 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     ).then((_) => _saglikKontrol());
   }
 
-  Widget _satir(Hat h, DateTime now, {Color? renk}) {
+  String _kalanYazi(DateTime when, DateTime now) {
+    final d = when.difference(now);
+    if (d.isNegative) return 'Kaçırıldı';
+    if (d.inMinutes < 1) return 'şimdi';
+    if (d.inMinutes < 60) return '${d.inMinutes} dk sonra';
+    if (d.inHours < 24) {
+      final m = d.inMinutes % 60;
+      return m == 0 ? '${d.inHours} sa sonra' : '${d.inHours} sa $m dk sonra';
+    }
+    return '${d.inDays} gün sonra';
+  }
+
+  Widget _satir(Hat h, DateTime now) {
     final gecmis = !h.done && h.when.isBefore(now);
-    final cs = Theme.of(context).colorScheme;
+    final f = gunFarki(h.when, now);
+    final Color renk = h.done
+        ? kGri
+        : gecmis
+            ? kKirmizi
+            : f == 0
+                ? kSari
+                : f == 1
+                    ? kMavi
+                    : kMor;
     return Dismissible(
       key: ValueKey('h${h.id}'),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: cs.errorContainer,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: kKirmizi.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(22),
+        ),
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        child: Icon(Icons.delete_outline, color: cs.onErrorContainer),
+        padding: const EdgeInsets.only(right: 26),
+        child: const Icon(Icons.delete_outline, color: kKirmizi),
       ),
       onDismissed: (_) => _sil(h),
-      child: ListTile(
-        leading: IconButton(
-          icon: Icon(h.done ? Icons.check_circle : Icons.radio_button_unchecked),
-          color: h.done ? cs.primary : (renk ?? cs.outline),
-          tooltip: h.done ? 'Geri al' : 'Tamamlandı',
-          onPressed: () => _bitti(h, !h.done),
-        ),
-        title: Text(
-          h.title,
-          style: TextStyle(
-            fontSize: 17,
-            decoration: h.done ? TextDecoration.lineThrough : null,
-            color: h.done ? cs.outline : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Material(
+          color: kYuzey,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _duzenle(baslik: h.title, zaman: h.when, mevcut: h),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 5, color: renk),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 64,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  hhmm(h.when),
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: renk,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  gunEtiketi(h.when, now),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: kSoluk),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  h.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    color: h.done ? kSoluk : Colors.white,
+                                    decoration: h.done
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                                if (h.early && !h.done)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 3),
+                                    child: Text('Bir gün önce de haber verir',
+                                        style: TextStyle(
+                                            fontSize: 12, color: kSoluk)),
+                                  ),
+                                if (gecmis)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 3),
+                                    child: Text('Kaçırıldı',
+                                        style: TextStyle(
+                                            fontSize: 12, color: kKirmizi)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              h.done
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                              color: h.done ? kYesil : renk,
+                              size: 28,
+                            ),
+                            onPressed: () => _bitti(h, !h.done),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        subtitle: Text(
-          '${zamanYazisi(h.when, now)}${h.early && !h.done ? '  •  bir gün önce de haber' : ''}',
-          style: TextStyle(color: gecmis ? cs.error : null),
-        ),
-        onTap: () => _duzenle(
-          baslik: h.title,
-          zaman: h.when,
-          mevcut: h,
         ),
       ),
     );
@@ -1427,125 +1592,390 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     if (l.isEmpty) return [];
     return [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
-        child: Text(
-          ad,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: renk ?? Theme.of(context).colorScheme.primary,
+        padding: const EdgeInsets.fromLTRB(26, 22, 24, 4),
+        child: Row(
+          children: [
+            Text(
+              ad,
+              style: TextStyle(
+                fontSize: 13,
+                letterSpacing: 0.6,
                 fontWeight: FontWeight.w700,
+                color: renk ?? kSoluk,
               ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: (renk ?? kSoluk).withOpacity(0.18),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text('${l.length}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: renk ?? kSoluk)),
+            ),
+          ],
         ),
       ),
-      ...l.map((h) => _satir(h, now, renk: renk)),
+      ...l.map((h) => _satir(h, now)),
     ];
+  }
+
+  Widget _baslik(DateTime now, int bekleyen) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(26, 18, 16, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_gunTam[now.weekday - 1]}, ${now.day} ${_ayTam[now.month - 1]}',
+                  style: const TextStyle(fontSize: 14, color: kSoluk),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Hatırlatıcı',
+                  style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      height: 1.1),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: kMor.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    bekleyen == 0 ? 'Her şey yolunda' : '$bekleyen hatırlatma bekliyor',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB9A8FF)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: GestureDetector(
+              onTap: _kurulumAc,
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: kYuzey,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF2A3160)),
+                ),
+                child: Badge(
+                  isLabelVisible: _uyari,
+                  child: const Icon(Icons.shield_outlined,
+                      color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hero(Hat h, DateTime now) {
+    return GestureDetector(
+      onTap: () => _duzenle(baslik: h.title, zaman: h.when, mevcut: h),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: kGradyan,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: kMor.withOpacity(0.35),
+              blurRadius: 30,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.alarm, color: Colors.white70, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  'SIRADAKİ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              h.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  hhmm(h.when),
+                  style: const TextStyle(
+                    fontSize: 46,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '${gunEtiketi(h.when, now)} • ${_kalanYazi(h.when, now)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bos() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 56, 32, 0),
+      child: Column(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: kGradyan,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: kMor.withOpacity(0.4),
+                  blurRadius: 40,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.mic, size: 56, color: Colors.white),
+          ),
+          const SizedBox(height: 28),
+          const Text(
+            'Mikrofona bas ve söyle',
+            style: TextStyle(
+                fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Gün ve saati kendim anlarım',
+            style: TextStyle(fontSize: 15, color: kSoluk),
+          ),
+          const SizedBox(height: 24),
+          for (final s in const [
+            'Yarın saat 9\'a toptancıyı ara',
+            'Haftaya salı akşam 6\'da doktor',
+            '2 saat sonra ütüyü kapat',
+          ])
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: kYuzey,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFF2A3160)),
+              ),
+              child: Text('“$s”',
+                  style: const TextStyle(fontSize: 15, color: Color(0xFFCBD1FF))),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _daire({
+    required double boy,
+    required Widget child,
+    required VoidCallback onTap,
+    Gradient? gradient,
+    Color? renk,
+    List<BoxShadow>? golge,
+    Border? kenar,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: boy,
+        height: boy,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: gradient,
+          color: renk,
+          boxShadow: golge,
+          border: kenar,
+        ),
+        child: Center(child: child),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final cs = Theme.of(context).colorScheme;
     final aktif = items.where((e) => !e.done).toList()
       ..sort((a, b) => a.whenMs.compareTo(b.whenMs));
     final bitenler = items.where((e) => e.done).toList()
       ..sort((a, b) => b.whenMs.compareTo(a.whenMs));
     final kacan = aktif.where((e) => e.when.isBefore(now)).toList();
     final gelecek = aktif.where((e) => !e.when.isBefore(now)).toList();
-    final bugun = gelecek.where((e) => gunFarki(e.when, now) == 0).toList();
-    final yarin = gelecek.where((e) => gunFarki(e.when, now) == 1).toList();
-    final hafta = gelecek
+    final sirada = gelecek.isEmpty ? null : gelecek.first;
+    final kalan = sirada == null
+        ? gelecek
+        : gelecek.where((e) => e.id != sirada.id).toList();
+    final bugun = kalan.where((e) => gunFarki(e.when, now) == 0).toList();
+    final yarin = kalan.where((e) => gunFarki(e.when, now) == 1).toList();
+    final hafta = kalan
         .where((e) => gunFarki(e.when, now) >= 2 && gunFarki(e.when, now) <= 7)
         .toList();
-    final sonra = gelecek.where((e) => gunFarki(e.when, now) > 7).toList();
+    final sonra = kalan.where((e) => gunFarki(e.when, now) > 7).toList();
 
-    final govde = <Widget>[];
+    final govde = <Widget>[_baslik(now, aktif.length)];
     if (_uyari) {
-      govde.add(Card(
-        color: cs.errorContainer,
-        margin: const EdgeInsets.all(12),
-        child: ListTile(
-          leading: Icon(Icons.warning_amber_rounded, color: cs.onErrorContainer),
-          title: Text('Bildirim izni eksik',
-              style: TextStyle(color: cs.onErrorContainer)),
-          subtitle: Text('Alarmın çalması için ayarı düzelt',
-              style: TextStyle(color: cs.onErrorContainer)),
-          trailing: FilledButton(onPressed: _kurulumAc, child: const Text('Düzelt')),
+      govde.add(GestureDetector(
+        onTap: _kurulumAc,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kKirmizi.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: kKirmizi.withOpacity(0.5)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: kKirmizi),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Alarmın çalması için bir izin eksik. Dokun ve düzelt.',
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.white54),
+            ],
+          ),
         ),
       ));
     }
-    govde.addAll(_bolum('Kaçırılan', kacan, now, renk: cs.error));
-    govde.addAll(_bolum('Bugün', bugun, now));
-    govde.addAll(_bolum('Yarın', yarin, now));
-    govde.addAll(_bolum('Bu hafta', hafta, now));
-    govde.addAll(_bolum('Daha sonra', sonra, now));
-    if (bitenler.isNotEmpty) {
-      govde.add(Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: ExpansionTile(
-          title: Text('Tamamlananlar (${bitenler.length})'),
-          children: bitenler.map((h) => _satir(h, now)).toList(),
-        ),
-      ));
+    if (aktif.isEmpty && bitenler.isEmpty) {
+      govde.add(_bos());
+    } else {
+      if (sirada != null) govde.add(_hero(sirada, now));
+      govde.addAll(_bolum('KAÇIRILAN', kacan, now, renk: kKirmizi));
+      govde.addAll(_bolum('BUGÜN', bugun, now));
+      govde.addAll(_bolum('YARIN', yarin, now));
+      govde.addAll(_bolum('BU HAFTA', hafta, now));
+      govde.addAll(_bolum('DAHA SONRA', sonra, now));
+      if (bitenler.isNotEmpty) {
+        govde.add(Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 26),
+              iconColor: kSoluk,
+              collapsedIconColor: kSoluk,
+              title: Text('TAMAMLANANLAR (${bitenler.length})',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      letterSpacing: 0.6,
+                      fontWeight: FontWeight.w700,
+                      color: kSoluk)),
+              children: bitenler.map((h) => _satir(h, now)).toList(),
+            ),
+          ),
+        ));
+      }
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hatırlatıcı'),
-        actions: [
-          IconButton(
-            tooltip: 'Telefon ayarları',
-            icon: Badge(
-              isLabelVisible: _uyari,
-              child: const Icon(Icons.shield_outlined),
-            ),
-            onPressed: _kurulumAc,
+      backgroundColor: kArka,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1A2050), kArka],
+            stops: [0.0, 0.5],
           ),
-        ],
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 170),
+            children: govde,
+          ),
+        ),
       ),
-      body: aktif.isEmpty && bitenler.isEmpty && !_uyari
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.mic_none, size: 72, color: cs.primary),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Mikrofona bas ve söyle',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '“Yarın akşam 8\'de toptancıyı ara”\n'
-                      '“Haftaya salı saat 10\'da doktor”\n'
-                      '“2 saat sonra ütüyü kapat”',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: cs.outline, height: 1.6),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.only(bottom: 150),
-              children: govde,
-            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FloatingActionButton.small(
-            heroTag: 'ekle',
-            tooltip: 'Yazarak ekle',
-            onPressed: _elleEkle,
-            child: const Icon(Icons.edit_outlined),
+          _daire(
+            boy: 58,
+            renk: kYuzey2,
+            kenar: Border.all(color: const Color(0xFF39407A)),
+            onTap: _elleEkle,
+            child: const Icon(Icons.edit_outlined, color: Colors.white, size: 24),
           ),
-          const SizedBox(width: 20),
-          FloatingActionButton.large(
-            heroTag: 'mik',
-            tooltip: 'Konuş',
-            onPressed: _mikrofon,
-            child: const Icon(Icons.mic, size: 40),
+          const SizedBox(width: 22),
+          _daire(
+            boy: 86,
+            gradient: kGradyan,
+            golge: [
+              BoxShadow(
+                color: kMor.withOpacity(0.6),
+                blurRadius: 32,
+                spreadRadius: 2,
+              ),
+            ],
+            onTap: _mikrofon,
+            child: const Icon(Icons.mic, color: Colors.white, size: 42),
           ),
         ],
       ),
@@ -1680,12 +2110,20 @@ class _SesPenceresiState extends State<SesPenceresi> {
                   height: boy,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _hata ? cs.errorContainer : cs.primaryContainer,
+                    gradient: _hata ? null : kGradyan,
+                    color: _hata ? cs.errorContainer : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_hata ? kKirmizi : kMor).withOpacity(0.5),
+                        blurRadius: 30 + _seviye.clamp(0.0, 10.0) * 3,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
                   child: Icon(
                     _hata ? Icons.mic_off : Icons.mic,
                     size: 48,
-                    color: _hata ? cs.onErrorContainer : cs.onPrimaryContainer,
+                    color: _hata ? cs.onErrorContainer : Colors.white,
                   ),
                 ),
               ),

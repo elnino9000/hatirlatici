@@ -68,6 +68,11 @@ jobs:
               p.write_text(g, encoding='utf-8')
               print('patched', f)
           PY
+      - name: Uygulama simgesi
+        run: |
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp icons/$d.png android/app/src/main/res/mipmap-$d/ic_launcher.png
+          done
       - run: flutter pub get
       - run: flutter build apk --release --no-shrink
       - uses: actions/upload-artifact@v4
