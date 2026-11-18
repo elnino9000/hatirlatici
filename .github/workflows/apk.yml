@@ -14,6 +14,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Sabit imza anahtari
+        run: |
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
       - name: Dosyalari yerlestir
         run: |
           if [ -f main.dart ]; then mkdir -p lib && mv main.dart lib/main.dart; fi

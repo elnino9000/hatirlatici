@@ -16,7 +16,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 // ---------------------------------------------------------------- sabitler
 
-const kChAlarm = 'hatirlatici_alarm_v1';
+const kChAlarm = 'hatirlatici_alarm_v2';
 const kChOnce = 'hatirlatici_onceden_v1';
 const kPaket = 'com.hatirlatici.hatirlatici';
 
@@ -531,6 +531,7 @@ NotificationDetails alarmDetails() {
       fullScreenIntent: true,
       audioAttributesUsage: AudioAttributesUsage.alarm,
       playSound: true,
+      sound: const UriAndroidNotificationSound('content://settings/system/alarm_alert'),
       enableVibration: true,
       vibrationPattern: Int64List.fromList(<int>[0, 700, 300, 700, 300, 700]),
       additionalFlags: Int32List.fromList(<int>[4]),
@@ -575,6 +576,7 @@ Future<void> initNotifications() async {
     description: 'Zamanı gelen hatırlatmalar (alarm sesiyle)',
     importance: Importance.max,
     playSound: true,
+    sound: UriAndroidNotificationSound('content://settings/system/alarm_alert'),
     enableVibration: true,
     audioAttributesUsage: AudioAttributesUsage.alarm,
   ));
