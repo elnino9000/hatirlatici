@@ -1701,6 +1701,23 @@ class _KurulumPenceresiState extends State<KurulumPenceresi>
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
+              child: FilledButton.icon(
+                icon: const Icon(Icons.volume_up),
+                label: const Text('Şimdi çal (hemen dene)'),
+                onPressed: () async {
+                  final nav = ScaffoldMessenger.of(context);
+                  try {
+                    await plugin.show(999998, 'Deneme', 'Hemen gösterilen bildirim',
+                        alarmDetails(), payload: '0|Deneme');
+                  } catch (e) {
+                    nav.showSnackBar(SnackBar(content: Text('Hata: $e')));
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.notifications_active_outlined),
                 label: const Text('Dene: 15 saniye sonra çalsın'),
