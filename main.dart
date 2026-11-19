@@ -148,18 +148,26 @@ class Store {
   }
 }
 
+class _NotSonuc {
+  final String text;
+  final bool pin;
+  _NotSonuc(this.text, this.pin);
+}
+
 class Not {
   int id;
   String text;
   int createdMs;
   bool done;
   int doneMs;
+  bool pin;
   Not({
     required this.id,
     required this.text,
     required this.createdMs,
     this.done = false,
     this.doneMs = 0,
+    this.pin = false,
   });
 
   DateTime get created => DateTime.fromMillisecondsSinceEpoch(createdMs);
@@ -170,6 +178,7 @@ class Not {
         'createdMs': createdMs,
         'done': done,
         'doneMs': doneMs,
+        'pin': pin,
       };
 
   factory Not.fromJson(Map<String, dynamic> j) => Not(
@@ -178,6 +187,7 @@ class Not {
         createdMs: (j['createdMs'] as num).toInt(),
         done: (j['done'] as bool?) ?? false,
         doneMs: ((j['doneMs'] as num?) ?? 0).toInt(),
+        pin: (j['pin'] as bool?) ?? false,
       );
 }
 
@@ -366,6 +376,9 @@ const Set<String> _dolgu = {
   'uyarı',
 };
 const Set<String> _sayiDegil = {
+  'bin',
+  'milyon',
+  'yüz',
   'tane',
   'adet',
   'kilo',
@@ -1155,6 +1168,222 @@ Future<void> yanitIsle(NotificationResponse r, {required bool fg}) async {
   } catch (_) {}
 }
 
+// ---------------------------------------------------------------- akıllı çözümleme
+
+class Kat {
+  final String ad;
+  final IconData ikon;
+  final Color renk;
+  const Kat(this.ad, this.ikon, this.renk);
+}
+
+const kKatGider = Kat('Gider', Icons.payments_outlined, Color(0xFFFFB84D));
+const kKatSaglik = Kat('Sağlık', Icons.medication_outlined, Color(0xFF2EE6A6));
+const kKatRandevu = Kat('Randevu', Icons.event_outlined, Color(0xFF3D8BFF));
+const kKatArac = Kat('Araç', Icons.directions_car_outlined, Color(0xFF8E9BFF));
+const kKatKargo = Kat('Kargo', Icons.local_shipping_outlined, Color(0xFFFF8A5C));
+const kKatAlisveris =
+    Kat('Alışveriş', Icons.shopping_basket_outlined, Color(0xFFFF6FB5));
+const kKatArama = Kat('Arama', Icons.call_outlined, Color(0xFF5CD6FF));
+const kKatGenel =
+    Kat('Not', Icons.sticky_note_2_outlined, Color(0xFF9AA3D6));
+
+final List<MapEntry<Kat, RegExp>> _katKurallari = [
+  MapEntry(
+      kKatGider,
+      RegExp(r'(?<![a-zçğıöşü])(borç|borc|ödeme|öde(?!v)|fatura|kira|aidat|taksit|kredi|maaş|gider|havale|eft|iban|tahsilat|senet|cari hesap)')),
+  MapEntry(
+      kKatSaglik,
+      RegExp(r'(?<![a-zçğıöşü])(ilaç|doktor|tahlil|hastane|eczane|diş|aşı|reçete|sağlık)')),
+  MapEntry(
+      kKatRandevu,
+      RegExp(r'(?<![a-zçğıöşü])(randevu|toplantı|görüşme|buluşma|buluş|mülakat|sınav|konser|düğün|nişan|davet|doğum günü|maç)')),
+  MapEntry(
+      kKatArac,
+      RegExp(r'(?<![a-zçğıöşü])(araba|araç|servis|lastik|sigorta|kasko|benzin|muayene)')),
+  MapEntry(
+      kKatKargo,
+      RegExp(r'(?<![a-zçğıöşü])(kargo|paket|teslim|sipariş|koli|gönderi)')),
+  MapEntry(
+      kKatAlisveris,
+      RegExp(r'(?<![a-zçğıöşü])(market|ekmek|süt|yumurta|peynir|alışveriş|bakkal|manav|sebze|meyve|deterjan|bebek bezi|satın al)')),
+  MapEntry(
+      kKatArama,
+      RegExp(r'(?<![a-zçğıöşü])(ara|aray[a-zçğıöşü]*|aram[a-zçğıöşü]*|arar|telefon|whatsapp|mesaj)(?![a-zçğıöşü])')),
+];
+
+Kat? katBul(String metin) {
+  final t = trLower(metin);
+  for (final k in _katKurallari) {
+    if (k.value.hasMatch(t)) return k.key;
+  }
+  if (tutarBul(metin) != null) return kKatGider;
+  return null;
+}
+
+const Map<String, int> _tBirler = {
+  'bir': 1,
+  'iki': 2,
+  'üç': 3,
+  'dört': 4,
+  'beş': 5,
+  'altı': 6,
+  'yedi': 7,
+  'sekiz': 8,
+  'dokuz': 9,
+};
+const Map<String, int> _tOnlar = {
+  'on': 10,
+  'yirmi': 20,
+  'otuz': 30,
+  'kırk': 40,
+  'elli': 50,
+  'altmış': 60,
+  'yetmiş': 70,
+  'seksen': 80,
+  'doksan': 90,
+};
+
+double? _kelimeTutar(String t) {
+  final w = t.split(RegExp(r'\s+'));
+  for (int i = 0; i < w.length; i++) {
+    int top = 0;
+    int cur = 0;
+    int j = i;
+    bool var_ = false;
+    while (j < w.length) {
+      final x = w[j];
+      if (_tBirler.containsKey(x)) {
+        cur += _tBirler[x]!;
+      } else if (_tOnlar.containsKey(x)) {
+        cur += _tOnlar[x]!;
+      } else if (x == 'yüz') {
+        cur = (cur == 0 ? 1 : cur) * 100;
+      } else if (x == 'bin') {
+        top += (cur == 0 ? 1 : cur) * 1000;
+        cur = 0;
+      } else if (x == 'milyon') {
+        top += (cur == 0 ? 1 : cur) * 1000000;
+        cur = 0;
+      } else {
+        break;
+      }
+      var_ = true;
+      j++;
+    }
+    if (var_ &&
+        j < w.length &&
+        (w[j] == 'lira' || w[j] == 'tl' || w[j] == 'liralık')) {
+      return (top + cur).toDouble();
+    }
+    if (var_) i = j - 1;
+  }
+  return null;
+}
+
+double? tutarBul(String metin) {
+  final t = trLower(metin).replaceAll('₺', ' tl ');
+  final re = RegExp(
+      r'(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?\s*(bin|milyon)?\s*(?:tl|lira|liralık)(?![a-zçğıöşü])');
+  final m = re.firstMatch(t);
+  if (m != null) {
+    final tam = m.group(1)!.replaceAll('.', '');
+    final kus = m.group(2);
+    var v = double.tryParse(kus == null ? tam : '$tam.$kus');
+    if (v != null) {
+      if (m.group(3) == 'bin') v *= 1000;
+      if (m.group(3) == 'milyon') v *= 1000000;
+      return v;
+    }
+  }
+  final on = RegExp(r'(?<![a-zçğıöşü])tl\s*(\d{1,3}(?:\.\d{3})+|\d+)').firstMatch(t);
+  if (on != null) {
+    return double.tryParse(on.group(1)!.replaceAll('.', ''));
+  }
+  return _kelimeTutar(t);
+}
+
+String tlYaz(double v) {
+  final tam = v.floor();
+  final kurus = ((v - tam) * 100).round();
+  final s = tam.toString();
+  final b = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write('.');
+    b.write(s[i]);
+  }
+  return kurus == 0 ? '$b ₺' : '$b,${kurus.toString().padLeft(2, '0')} ₺';
+}
+
+String notTemizle(String ham) {
+  var t = ham.trim();
+  t = t.replaceFirst(RegExp(r'^(lütfen|bana)\s+', caseSensitive: false), '');
+  t = t.replaceFirst(
+      RegExp(r'^not\s*(al|et|düş)?\s*[:,]?\s+', caseSensitive: false), '');
+  t = t.replaceFirst(
+      RegExp(r'\s+(diye\s+)?not\s+(al|et|düş)$', caseSensitive: false), '');
+  t = t.trim();
+  return t.isEmpty ? ham.trim() : t;
+}
+
+class Girdi {
+  final String ham;
+  final String baslik;
+  final DateTime? zaman;
+  Girdi(this.ham, this.baslik, this.zaman);
+}
+
+final RegExp _gunIsareti = RegExp(
+    r'(yarın|bugün|öbür gün|ertesi gün|haftaya|pazartesi|salı|çarşamba|perşembe|cumartesi|cuma|pazar)');
+final RegExp _ayiranlar =
+    RegExp(r'(\s*[,;]\s*|\s+(?:ve de|ve|bir de|ayrıca|ardından)\s+)');
+
+// Tek cümlede birden çok iş varsa ayırır:
+// "yarın 9'da bankaya git ve akşam 6'da market" -> iki ayrı girdi
+List<Girdi> girdiCoz(String raw, DateTime now) {
+  final metin = raw.trim();
+  final parcalar = <String>[];
+  final ayrac = <String>[];
+  int son = 0;
+  for (final m in _ayiranlar.allMatches(metin)) {
+    parcalar.add(metin.substring(son, m.start));
+    ayrac.add(m.group(0)!.trim());
+    son = m.end;
+  }
+  parcalar.add(metin.substring(son));
+
+  final gruplar = <String>[];
+  String cur = parcalar.first;
+  for (int i = 1; i < parcalar.length; i++) {
+    var sg = parcalar[i];
+    if (sg.trim().isEmpty) continue;
+    final ay = ayrac[i - 1];
+    final kendiZamani = parseTr(sg, now).when != null;
+    final yeni = ay == 'bir de' || ay == 'ayrıca' || kendiZamani;
+    if (yeni && cur.trim().isNotEmpty) {
+      // "yarın ... ve akşam 6'da ..." -> ikinci iş de yarına ait
+      if (kendiZamani && !_gunIsareti.hasMatch(trLower(sg))) {
+        final g = _gunIsareti.firstMatch(trLower(cur))?.group(0);
+        if (g != null) sg = '$g $sg';
+      }
+      gruplar.add(cur);
+      cur = sg;
+    } else {
+      final bag = (ay == ',' || ay == ';') ? ', ' : ' $ay ';
+      cur = '$cur$bag$sg';
+    }
+  }
+  gruplar.add(cur);
+
+  return gruplar
+      .where((g) => g.trim().isNotEmpty)
+      .map((g) {
+        final p = parseTr(g, now);
+        return Girdi(g.trim(), p.title, p.when);
+      })
+      .toList();
+}
+
 // ---------------------------------------------------------------- uygulama
 
 Future<void> main() async {
@@ -1238,10 +1467,16 @@ class AnaSayfa extends StatefulWidget {
   State<AnaSayfa> createState() => _AnaSayfaState();
 }
 
-class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
+class _AnaSayfaState extends State<AnaSayfa>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   static const MethodChannel _kanal = MethodChannel('hatirlatici/hizli');
   bool _hizliAcik = false;
   int _sekme = 0;
+  String _ara = '';
+  final TextEditingController _araC = TextEditingController();
+  late final AnimationController _nabizAnim = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 2400))
+    ..repeat();
   List<Not> notlar = [];
   List<Hat> items = [];
   Timer? _timer;
@@ -1265,6 +1500,8 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     yenileSinyali.removeListener(_yukle);
     _kanal.setMethodCallHandler(null);
+    _nabizAnim.dispose();
+    _araC.dispose();
     _timer?.cancel();
     super.dispose();
   }
@@ -1418,19 +1655,50 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       builder: (_) => const SesPenceresi(),
     );
     if (metin == null || metin.trim().isEmpty || !mounted) return;
-    final p = parseTr(metin, DateTime.now());
-    if (p.when == null) {
+    final gs = girdiCoz(metin, DateTime.now());
+    if (gs.length > 1) {
+      // Tek cümlede birden çok iş: hepsini ayrı ayrı kaydet
+      final r = await _topluKaydet(gs);
+      if (!mounted) return;
+      setState(() => _sekme = (r[0] == 0 && r[1] > 0) ? 1 : 0);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${r[0] + r[1]} öğe eklendi: '
+            '${r[0]} hatırlatma, ${r[1]} not'),
+      ));
+      return;
+    }
+    final g = gs.first;
+    if (g.zaman == null) {
       // Saat söylenmedi: not olarak sakla
-      final n = await _notEkle(trBuyuk(metin.trim()));
+      final n = await _notEkle(trBuyuk(notTemizle(metin)));
       _notBildir(n);
       return;
     }
     await _duzenle(
-      baslik: p.title,
-      zaman: p.when,
+      baslik: g.baslik,
+      zaman: g.zaman,
       duyulan: metin,
       notOlabilir: true,
     );
+  }
+
+  Future<List<int>> _topluKaydet(List<Girdi> gs) async {
+    int hat = 0;
+    int nt = 0;
+    final simdi = DateTime.now();
+    for (final g in gs) {
+      final z = g.zaman;
+      if (z != null && z.isAfter(simdi) && g.baslik.trim().isNotEmpty) {
+        final erken = z.difference(simdi) >= const Duration(hours: 36);
+        await _taslagiKaydet(Taslak(g.baslik.trim(), z, erken), null,
+            sessiz: true);
+        hat++;
+      } else {
+        await _notEkle(trBuyuk(notTemizle(g.ham)));
+        nt++;
+      }
+    }
+    return [hat, nt];
   }
 
   Future<void> _elleEkle() async {
@@ -1471,12 +1739,13 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
 
   // ------------------------------------------------------------ notlar
 
-  Future<Not> _notEkle(String metin) async {
+  Future<Not> _notEkle(String metin, {bool pin = false}) async {
     final l = await NotStore.load();
     final n = Not(
       id: await Store.nextId(),
       text: metin.trim(),
       createdMs: DateTime.now().millisecondsSinceEpoch,
+      pin: pin,
     );
     l.add(n);
     await NotStore.save(l);
@@ -1506,7 +1775,18 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     if (mounted) setState(() => notlar = l);
   }
 
+  Future<void> _notPinle(Not n) async {
+    HapticFeedback.mediumImpact();
+    final l = await NotStore.load();
+    final i = l.indexWhere((e) => e.id == n.id);
+    if (i < 0) return;
+    l[i].pin = !l[i].pin;
+    await NotStore.save(l);
+    if (mounted) setState(() => notlar = l);
+  }
+
   Future<void> _notYapildi(Not n) async {
+    HapticFeedback.lightImpact();
     n.done = true;
     n.doneMs = DateTime.now().millisecondsSinceEpoch;
     setState(() {});
@@ -1530,42 +1810,58 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
 
   Future<void> _notDialog({Not? mevcut}) async {
     final c = TextEditingController(text: mevcut?.text ?? '');
-    final sonuc = await showDialog<String>(
+    bool pin = mevcut?.pin ?? false;
+    final sonuc = await showDialog<_NotSonuc>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: kYuzey,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-        title: Text(mevcut == null ? 'Yeni not' : 'Notu düzenle'),
-        content: TextField(
-          controller: c,
-          autofocus: true,
-          minLines: 2,
-          maxLines: 6,
-          textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 18),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) => AlertDialog(
+          backgroundColor: kYuzey,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          title: Text(mevcut == null ? 'Yeni not' : 'Notu düzenle'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: c,
+                autofocus: true,
+                minLines: 2,
+                maxLines: 6,
+                textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(fontSize: 18),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Sabitle'),
+                subtitle: const Text('Listenin ve widget\'ın en üstünde kalır'),
+                value: pin,
+                onChanged: (v) => set(() => pin = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(_NotSonuc(c.text.trim(), pin)),
+              child: const Text('Kaydet'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(c.text.trim()),
-            child: const Text('Kaydet'),
-          ),
-        ],
       ),
     );
     c.dispose();
-    if (sonuc == null || sonuc.isEmpty) return;
+    if (sonuc == null || sonuc.text.isEmpty) return;
     if (mevcut == null) {
-      await _notEkle(sonuc);
+      await _notEkle(sonuc.text, pin: sonuc.pin);
       return;
     }
     final l = await NotStore.load();
     final i = l.indexWhere((e) => e.id == mevcut.id);
     if (i < 0) return;
-    l[i].text = sonuc;
+    l[i].text = sonuc.text;
+    l[i].pin = sonuc.pin;
     await NotStore.save(l);
     if (mounted) setState(() => notlar = l);
   }
@@ -1647,10 +1943,17 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       );
       if (metin == null || metin.trim().isEmpty || !mounted) return;
       final simdi = DateTime.now();
-      final p = parseTr(metin, simdi);
+      final gs = girdiCoz(metin, simdi);
+      if (gs.length > 1) {
+        final r = await _topluKaydet(gs);
+        await _onay('${r[0] + r[1]} öğe eklendi',
+            '${r[0]} hatırlatma · ${r[1]} not');
+        return;
+      }
+      final p = Parsed(gs.first.baslik, gs.first.zaman);
       final z = p.when;
       if (z == null) {
-        final n = await _notEkle(trBuyuk(metin.trim()));
+        final n = await _notEkle(trBuyuk(notTemizle(metin)));
         await _onay('Nota eklendi', n.text);
         return;
       }
@@ -1808,6 +2111,24 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                if (katBul(h.title) != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(katBul(h.title)!.ikon,
+                                            size: 13,
+                                            color: katBul(h.title)!.renk),
+                                        const SizedBox(width: 5),
+                                        Text(katBul(h.title)!.ad,
+                                            style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: katBul(h.title)!.renk)),
+                                      ],
+                                    ),
+                                  ),
                                 Text(
                                   h.title,
                                   maxLines: 2,
@@ -1893,11 +2214,11 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
           ],
         ),
       ),
-      ...l.map((h) => _satir(h, now)),
+      ...l.asMap().entries.map((e) => _giris(_satir(e.value, now), sira: e.key)),
     ];
   }
 
-  Widget _baslik(DateTime now, int bekleyen) {
+  Widget _baslik(DateTime now, int bekleyen, {String? ozet}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 18, 16, 6),
       child: Row(
@@ -1929,7 +2250,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
-                    bekleyen == 0 ? 'Her şey yolunda' : '$bekleyen hatırlatma bekliyor',
+                    ozet ?? (bekleyen == 0 ? 'Her şey yolunda' : '$bekleyen hatırlatma bekliyor'),
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -2134,8 +2455,13 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       final secili = _sekme == i;
       return Expanded(
         child: GestureDetector(
-          onTap: () => setState(() => _sekme = i),
-          child: Container(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => _sekme = i);
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
               color: secili ? kMor : kYuzey,
@@ -2167,22 +2493,114 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     );
   }
 
+  Widget _giris(Widget child, {int sira = 0}) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 320 + min(sira, 6) * 45),
+      curve: Curves.easeOutCubic,
+      builder: (c, v, ch) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, (1 - v) * 14), child: ch),
+      ),
+      child: child,
+    );
+  }
+
   List<Widget> _notlarGovde(DateTime now) {
-    final aktif = notlar.where((e) => !e.done).toList()
-      ..sort((a, b) => b.createdMs.compareTo(a.createdMs));
+    final ara = trLower(_ara.trim());
+    final tumAktif = notlar.where((e) => !e.done).toList();
+    var aktif = List<Not>.from(tumAktif)
+      ..sort((a, b) {
+        if (a.pin != b.pin) return a.pin ? -1 : 1;
+        return b.createdMs.compareTo(a.createdMs);
+      });
+    if (ara.isNotEmpty) {
+      aktif = aktif.where((e) => trLower(e.text).contains(ara)).toList();
+    }
     final biten = notlar.where((e) => e.done).toList()
       ..sort((a, b) => b.doneMs.compareTo(a.doneMs));
-    if (aktif.isEmpty && biten.isEmpty) return [_notBos()];
-    final w = <Widget>[const SizedBox(height: 6)];
+    if (tumAktif.isEmpty && biten.isEmpty) return [_notBos()];
+    final w = <Widget>[];
+    if (tumAktif.length >= 4 || ara.isNotEmpty) {
+      w.add(Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+        child: TextField(
+          controller: _araC,
+          onChanged: (v) => setState(() => _ara = v),
+          style: const TextStyle(fontSize: 16),
+          decoration: InputDecoration(
+            hintText: 'Notlarda ara',
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 13),
+            prefixIcon: const Icon(Icons.search, color: kSoluk),
+            suffixIcon: _ara.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.close, color: kSoluk),
+                    onPressed: () {
+                      _araC.clear();
+                      setState(() => _ara = '');
+                    },
+                  ),
+          ),
+        ),
+      ));
+    }
+    double toplam = 0;
+    int say = 0;
     for (final n in aktif) {
-      w.add(_notSatir(n, now));
+      final t = tutarBul(n.text);
+      if (t != null) {
+        toplam += t;
+        say++;
+      }
+    }
+    if (say > 0) {
+      w.add(Container(
+        margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0x33FFB84D), Color(0x1AFF8A5C)],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0x55FFB84D)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.payments_outlined, color: kSari, size: 28),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Tutarlı notların toplamı',
+                      style: TextStyle(fontSize: 12.5, color: kSoluk)),
+                  const SizedBox(height: 2),
+                  Text(tlYaz(toplam),
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
+                ],
+              ),
+            ),
+            Text('$say not',
+                style: const TextStyle(fontSize: 13, color: kSoluk)),
+          ],
+        ),
+      ));
+    }
+    w.add(const SizedBox(height: 6));
+    for (int i = 0; i < aktif.length; i++) {
+      w.add(_giris(_notSatir(aktif[i], now), sira: i));
     }
     if (aktif.isEmpty) {
-      w.add(const Padding(
-        padding: EdgeInsets.fromLTRB(32, 30, 32, 10),
-        child: Text('Bekleyen not yok.',
+      w.add(Padding(
+        padding: const EdgeInsets.fromLTRB(32, 30, 32, 10),
+        child: Text(ara.isNotEmpty ? 'Eşleşen not yok.' : 'Bekleyen not yok.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: kSoluk)),
+            style: const TextStyle(fontSize: 16, color: kSoluk)),
       ));
     }
     if (biten.isNotEmpty) {
@@ -2252,8 +2670,28 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
 
   Widget _notSatir(Not n, DateTime now) {
     final yas = gunFarki(now, n.created);
-    final Color renk = yas <= 0 ? kMavi : (yas <= 2 ? kSari : kKirmizi);
-    final String etiket = yas <= 0 ? 'Bugün' : (yas == 1 ? 'Dün' : '$yas gün önce');
+    final Color yasRenk = yas <= 0 ? kMavi : (yas <= 2 ? kSari : kKirmizi);
+    final String etiket =
+        yas <= 0 ? 'Bugün' : (yas == 1 ? 'Dün' : '$yas gün önce');
+    final kat = katBul(n.text) ?? kKatGenel;
+    final tutar = tutarBul(n.text);
+    Widget chip(String t, Color c, {IconData? ikon}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: c.withOpacity(0.16),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (ikon != null) Icon(ikon, size: 12, color: c),
+              if (ikon != null) const SizedBox(width: 4),
+              Text(t,
+                  style: TextStyle(
+                      fontSize: 11.5, fontWeight: FontWeight.w700, color: c)),
+            ],
+          ),
+        );
     return Dismissible(
       key: ValueKey('n${n.id}'),
       direction: DismissDirection.endToStart,
@@ -2261,7 +2699,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: kYesil.withOpacity(0.22),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(24),
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 26),
@@ -2272,18 +2710,37 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Material(
           color: kYuzey,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(24),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _notDialog(mevcut: n),
-            child: IntrinsicHeight(
+            onLongPress: () => _notPinle(n),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: n.pin
+                      ? kMor.withOpacity(0.55)
+                      : Colors.white.withOpacity(0.05),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(14, 14, 2, 14),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(width: 5, color: renk),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: kat.renk.withOpacity(0.16),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Icon(kat.ikon, color: kat.renk, size: 22),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 4, 14),
+                      padding: const EdgeInsets.only(top: 2),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -2294,29 +2751,39 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
                               style: const TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w600,
+                                  height: 1.25,
                                   color: Colors.white)),
-                          const SizedBox(height: 4),
-                          Text(etiket,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: yas <= 0 ? kSoluk : renk)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              if (n.pin)
+                                chip('Sabit', kMor, ikon: Icons.push_pin),
+                              chip(etiket, yasRenk),
+                              if (kat != kKatGenel) chip(kat.ad, kat.renk),
+                              if (tutar != null)
+                                chip(tlYaz(tutar), kSari,
+                                    ikon: Icons.payments_outlined),
+                            ],
+                          ),
                         ],
                       ),
                     ),
                   ),
                   IconButton(
                     tooltip: 'Hatırlatma kur',
+                    visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.alarm_add_outlined,
-                        color: kSoluk, size: 24),
+                        color: kSoluk, size: 22),
                     onPressed: () => _notuHatirlatmayaCevir(n),
                   ),
                   IconButton(
                     tooltip: 'Yapıldı',
                     icon: Icon(Icons.radio_button_unchecked,
-                        color: renk, size: 28),
+                        color: yasRenk, size: 28),
                     onPressed: () => _notYapildi(n),
                   ),
-                  const SizedBox(width: 2),
                 ],
               ),
             ),
@@ -2372,7 +2839,12 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         .toList();
     final sonra = kalan.where((e) => gunFarki(e.when, now) > 7).toList();
 
-    final govde = <Widget>[_baslik(now, aktif.length)];
+    final govde = <Widget>[
+      _baslik(now, aktif.length,
+          ozet: _sekme == 1
+              ? '${notlar.where((e) => !e.done).length} not · ${aktif.length} hatırlatma'
+              : null)
+    ];
     if (_uyari) {
       govde.add(GestureDetector(
         onTap: _kurulumAc,
@@ -2401,19 +2873,20 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       ));
     }
     govde.add(_sekmeler(aktif.length, notlar.where((e) => !e.done).length));
+    final icerik = <Widget>[];
     if (_sekme == 1) {
-      govde.addAll(_notlarGovde(now));
+      icerik.addAll(_notlarGovde(now));
     } else if (aktif.isEmpty && bitenler.isEmpty) {
-      govde.add(_bos());
+      icerik.add(_bos());
     } else {
-      if (sirada != null) govde.add(_hero(sirada, now));
-      govde.addAll(_bolum('KAÇIRILAN', kacan, now, renk: kKirmizi));
-      govde.addAll(_bolum('BUGÜN', bugun, now));
-      govde.addAll(_bolum('YARIN', yarin, now));
-      govde.addAll(_bolum('BU HAFTA', hafta, now));
-      govde.addAll(_bolum('DAHA SONRA', sonra, now));
+      if (sirada != null) icerik.add(_hero(sirada, now));
+      icerik.addAll(_bolum('KAÇIRILAN', kacan, now, renk: kKirmizi));
+      icerik.addAll(_bolum('BUGÜN', bugun, now));
+      icerik.addAll(_bolum('YARIN', yarin, now));
+      icerik.addAll(_bolum('BU HAFTA', hafta, now));
+      icerik.addAll(_bolum('DAHA SONRA', sonra, now));
       if (bitenler.isNotEmpty) {
-        govde.add(Padding(
+        icerik.add(Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -2433,6 +2906,25 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         ));
       }
     }
+
+    govde.add(AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOutCubic,
+      transitionBuilder: (c, a) => FadeTransition(
+        opacity: a,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0.04, 0), end: Offset.zero)
+              .animate(a),
+          child: c,
+        ),
+      ),
+      child: Column(
+        key: ValueKey(_sekme),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: icerik,
+      ),
+    ));
 
     return Scaffold(
       backgroundColor: kArka,
@@ -2465,18 +2957,50 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
             child: const Icon(Icons.edit_outlined, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 22),
-          _daire(
-            boy: 86,
-            gradient: kGradyan,
-            golge: [
-              BoxShadow(
-                color: kMor.withOpacity(0.6),
-                blurRadius: 32,
-                spreadRadius: 2,
-              ),
-            ],
-            onTap: _mikrofon,
-            child: const Icon(Icons.mic, color: Colors.white, size: 42),
+          SizedBox(
+            width: 86,
+            height: 86,
+            child: Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _nabizAnim,
+                    builder: (c, _) {
+                      final t = _nabizAnim.value;
+                      return Container(
+                        width: 86 + 46 * t,
+                        height: 86 + 46 * t,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: kMor.withOpacity((1 - t) * 0.55),
+                            width: 2,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                _daire(
+                  boy: 86,
+                  gradient: kGradyan,
+                  golge: [
+                    BoxShadow(
+                      color: kMor.withOpacity(0.6),
+                      blurRadius: 32,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    _mikrofon();
+                  },
+                  child: const Icon(Icons.mic, color: Colors.white, size: 42),
+                ),
+              ],
+            ),
           ),
         ],
       ),

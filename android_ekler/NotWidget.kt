@@ -15,22 +15,33 @@ object NotVeri {
     private const val DOSYA = "FlutterSharedPreferences"
     private const val ANAHTAR = "flutter.notlar_v1"
 
+    private class Kayit(val id: Long, val text: String, val created: Long, val pin: Boolean)
+
     fun oku(ctx: Context): List<Pair<Long, String>> {
         val raw = ctx.getSharedPreferences(DOSYA, Context.MODE_PRIVATE)
             .getString(ANAHTAR, null) ?: return emptyList()
-        val liste = ArrayList<Triple<Long, String, Long>>()
+        val liste = ArrayList<Kayit>()
         try {
             val a = JSONArray(raw)
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
                 if (o.optBoolean("done", false)) continue
-                liste.add(Triple(o.getLong("id"), o.getString("text"), o.optLong("createdMs", 0L)))
+                liste.add(
+                    Kayit(
+                        o.getLong("id"),
+                        o.getString("text"),
+                        o.optLong("createdMs", 0L),
+                        o.optBoolean("pin", false)
+                    )
+                )
             }
         } catch (e: Exception) {
             return emptyList()
         }
-        liste.sortByDescending { it.third }
-        return liste.map { Pair(it.first, it.second) }
+        val sirali = liste.sortedWith(
+            compareByDescending<Kayit> { it.pin }.thenByDescending { it.created }
+        )
+        return sirali.map { Pair(it.id, if (it.pin) "\uD83D\uDCCC " + it.text else it.text) }
     }
 
     fun bitir(ctx: Context, id: Long) {
