@@ -1941,6 +1941,28 @@ class _AnaSayfaState extends State<AnaSayfa>
     ));
   }
 
+  Future<void> _notSil(List<Not> silinecek) async {
+    HapticFeedback.mediumImpact();
+    final ids = silinecek.map((e) => e.id).toSet();
+    final l = await NotStore.load();
+    l.removeWhere((e) => ids.contains(e.id));
+    await NotStore.save(l);
+    if (!mounted) return;
+    setState(() => notlar = l);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(silinecek.length == 1 ? 'Not silindi' : 'Notlar silindi'),
+      action: SnackBarAction(
+        label: 'Geri al',
+        onPressed: () async {
+          final y = await NotStore.load();
+          y.addAll(silinecek);
+          await NotStore.save(y);
+          if (mounted) setState(() => notlar = y);
+        },
+      ),
+    ));
+  }
+
   Future<void> _notDialog({Not? mevcut}) async {
     final c = TextEditingController(text: mevcut?.text ?? '');
     bool pin = mevcut?.pin ?? false;
@@ -2756,7 +2778,7 @@ class _AnaSayfaState extends State<AnaSayfa>
                     letterSpacing: 0.6,
                     fontWeight: FontWeight.w700,
                     color: kSoluk)),
-            subtitle: const Text('7 gün saklanır, dokununca geri gelir',
+            subtitle: const Text('7 gün saklanır · geri al veya çöp kutusuyla sil',
                 style: TextStyle(fontSize: 12, color: kSoluk)),
             children: biten
                 .map((n) => Padding(
@@ -2772,11 +2794,36 @@ class _AnaSayfaState extends State<AnaSayfa>
                             style: const TextStyle(
                                 color: kSoluk,
                                 decoration: TextDecoration.lineThrough)),
-                        trailing: const Icon(Icons.undo, color: kSoluk),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Geri al',
+                              icon: const Icon(Icons.undo, color: kSoluk),
+                              onPressed: () => _notBitir(n, false),
+                            ),
+                            IconButton(
+                              tooltip: 'Sil',
+                              icon: const Icon(Icons.delete_outline,
+                                  color: Color(0xFFFF7A7A)),
+                              onPressed: () => _notSil([n]),
+                            ),
+                          ],
+                        ),
                         onTap: () => _notBitir(n, false),
                       ),
                     ))
-                .toList(),
+                .toList()
+              ..add(Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextButton.icon(
+                  onPressed: () => _notSil(List<Not>.from(biten)),
+                  icon: const Icon(Icons.delete_sweep_outlined,
+                      color: Color(0xFFFF7A7A)),
+                  label: const Text('Hepsini sil',
+                      style: TextStyle(color: Color(0xFFFF7A7A))),
+                ),
+              )),
           ),
         ),
       ));
