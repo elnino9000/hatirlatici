@@ -1,0 +1,21 @@
+name: Dil testi
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Projeyi hazirla
+        run: |
+          mkdir -p lib && cp main.dart lib/main.dart
+          flutter create --platforms=android --project-name hatirlatici --org com.hatirlatici .
+          cp main.dart lib/main.dart
+          printf '\ndev_dependencies:\n  flutter_test:\n    sdk: flutter\n' >> pubspec.yaml
+          mkdir -p test && cp test_ekler/dil_test.dart test/dil_test.dart
+      - run: flutter pub get
+      - run: flutter test test/dil_test.dart --reporter expanded

@@ -357,6 +357,28 @@ const List<MapEntry<String, int>> _aylar = [
   MapEntry('aralık', 12),
 ];
 const Set<String> _dolgu = {
+  'bunu',
+  'şunu',
+  'onu',
+  'bunları',
+  'şunları',
+  'onları',
+  'mısın',
+  'misin',
+  'musun',
+  'müsün',
+  'mısınız',
+  'rica',
+  'ederim',
+  'eder',
+  'kurar',
+  'ayarlar',
+  'koy',
+  'koyar',
+  'olsun',
+  'çalsın',
+  'alarmı',
+  'alarmını',
   'bana',
   'bize',
   'beni',
@@ -1327,10 +1349,74 @@ String notTemizle(String ham) {
 }
 
 class Girdi {
-  final String ham;
+  final String ham; // niyet kalıbı temizlenmiş metin
   final String baslik;
   final DateTime? zaman;
-  Girdi(this.ham, this.baslik, this.zaman);
+  final int niyet; // 0 belirsiz, 1 not, 2 hatırlatma
+  Girdi(this.ham, this.baslik, this.zaman, [this.niyet = 0]);
+}
+
+// "not ekle / not yaz / kayıt et / deftere yaz ..." -> NOT
+final RegExp _notNiyeti = RegExp(
+    r'(?<![a-zçğıöşü])(?:(?:bir\s+)?not\s*(?:olarak\s+)?(?:ekle|ekler\s*misin|ekleyelim|et|edelim|al|alalım|yaz|yazalım|düş|tut|kaydet|yap)|not\s*:|(?:deftere|defterime|notlara|notlarıma|listeye|listeme|not\s+defterine)\s*(?:ekle|yaz|kaydet|not\s*et|not\s*al)|kay[ıi]t\s*(?:et|ekle|yap|al|oluştur)(?:elim)?|kaydet(?:elim)?|notla)(?![a-zçğıöşü])');
+
+// "hatırlat / alarm kur / uyar / haber ver ..." -> HATIRLATMA
+final RegExp _hatNiyeti = RegExp(
+    r'(?<![a-zçğıöşü])(?:hatırlat[a-zçğıöşü]*|anımsat[a-zçğıöşü]*|(?:bir\s+)?alarm[a-zçğıöşü]*\s+(?:kur|ayarla|koy|ekle|olsun|çal|yap|oluştur|lazım|gerek)[a-zçğıöşü]*|uyandır[a-zçğıöşü]*|uyar(?!ı)[a-zçğıöşü]*|haber\s+ver[a-zçğıöşü]*|unutturma[a-zçğıöşü]*|çalsın|çalar)(?![a-zçğıöşü])');
+
+String _sil(String t, RegExp re) {
+  final low = trLower(t);
+  String r;
+  if (low.length != t.length) {
+    r = low.replaceAll(re, ' ');
+  } else {
+    final b = StringBuffer();
+    int son = 0;
+    for (final m in re.allMatches(low)) {
+      b.write(t.substring(son, m.start));
+      b.write(' ');
+      son = m.end;
+    }
+    b.write(t.substring(son));
+    r = b.toString();
+  }
+  r = r.replaceAll(RegExp(r'\s+'), ' ').trim();
+  r = r.replaceAll(RegExp(r'^[\s.,;:!?\-]+|[\s.,;:!?\-]+$'), '');
+  return r.trim();
+}
+
+class Niyet {
+  final int tur; // 0 yok, 1 not, 2 hatırlatma
+  final String metin;
+  Niyet(this.tur, this.metin);
+}
+
+Niyet niyetBul(String ham, DateTime now) {
+  final low = trLower(ham);
+  final not = _notNiyeti.hasMatch(low);
+  final hat = _hatNiyeti.hasMatch(low);
+  if (not && !hat) {
+    return Niyet(1, _notMetni(_sil(ham, _notNiyeti), ham));
+  }
+  if (hat && !not) {
+    final t = _sil(ham, _hatNiyeti);
+    return Niyet(2, t.isEmpty ? ham.trim() : t);
+  }
+  if (not && hat) {
+    final t = _sil(_sil(ham, _notNiyeti), _hatNiyeti);
+    // hem "not" hem "hatırlat" varsa: saat söylendiyse alarm, yoksa not
+    if (parseTr(t, now).when != null) return Niyet(2, t);
+    return Niyet(1, _notMetni(t, ham));
+  }
+  return Niyet(0, ham.trim());
+}
+
+String _notMetni(String t, String ham) {
+  var r = t.trim();
+  r = r.replaceFirst(RegExp(r'^(lütfen|bana|şunu|bunu)\s+', caseSensitive: false), '');
+  r = r.replaceFirst(RegExp(r'\s+diye$', caseSensitive: false), '');
+  r = r.trim();
+  return r.isEmpty ? ham.trim() : r;
 }
 
 final RegExp _gunIsareti = RegExp(
@@ -1378,8 +1464,12 @@ List<Girdi> girdiCoz(String raw, DateTime now) {
   return gruplar
       .where((g) => g.trim().isNotEmpty)
       .map((g) {
-        final p = parseTr(g, now);
-        return Girdi(g.trim(), p.title, p.when);
+        final nv = niyetBul(g, now);
+        final p = parseTr(nv.metin, now);
+        if (nv.tur == 1) {
+          return Girdi(nv.metin, trBuyuk(nv.metin), null, 1);
+        }
+        return Girdi(nv.metin, p.title, p.when, nv.tur);
       })
       .toList();
 }
@@ -1668,12 +1758,13 @@ class _AnaSayfaState extends State<AnaSayfa>
       return;
     }
     final g = gs.first;
-    if (g.zaman == null) {
-      // Saat söylenmedi: not olarak sakla
-      final n = await _notEkle(trBuyuk(notTemizle(metin)));
+    if (g.niyet == 1 || (g.zaman == null && g.niyet == 0)) {
+      // "not ekle" dendi ya da saat söylenmedi: not olarak sakla
+      final n = await _notEkle(trBuyuk(notTemizle(g.ham)));
       _notBildir(n);
       return;
     }
+    // Hatırlatma isteği: saat yoksa saati sor
     await _duzenle(
       baslik: g.baslik,
       zaman: g.zaman,
@@ -1688,7 +1779,7 @@ class _AnaSayfaState extends State<AnaSayfa>
     final simdi = DateTime.now();
     for (final g in gs) {
       final z = g.zaman;
-      if (z != null && z.isAfter(simdi) && g.baslik.trim().isNotEmpty) {
+      if (g.niyet != 1 && z != null && z.isAfter(simdi) && g.baslik.trim().isNotEmpty) {
         final erken = z.difference(simdi) >= const Duration(hours: 36);
         await _taslagiKaydet(Taslak(g.baslik.trim(), z, erken), null,
             sessiz: true);
@@ -1953,7 +2044,12 @@ class _AnaSayfaState extends State<AnaSayfa>
       final p = Parsed(gs.first.baslik, gs.first.zaman);
       final z = p.when;
       if (z == null) {
-        final n = await _notEkle(trBuyuk(notTemizle(metin)));
+        if (gs.first.niyet == 2) {
+          // "hatırlat" dendi ama saat anlaşılamadı: saati sor
+          await _duzenle(baslik: p.title, zaman: null, duyulan: metin);
+          return;
+        }
+        final n = await _notEkle(trBuyuk(notTemizle(gs.first.ham)));
         await _onay('Nota eklendi', n.text);
         return;
       }
@@ -3020,10 +3116,15 @@ class SesPenceresi extends StatefulWidget {
 class _SesPenceresiState extends State<SesPenceresi> {
   final stt.SpeechToText _sp = stt.SpeechToText();
   String _metin = '';
+  String _biriken = '';
+  String _gecici = '';
   String _mesaj = 'Hazırlanıyor…';
+  String? _loc;
   double _seviye = 0;
   bool _kapandi = false;
   bool _hata = false;
+  bool _oturumKelime = false;
+  bool _bitisIsleniyor = false;
 
   @override
   void initState() {
@@ -3040,18 +3141,25 @@ class _SesPenceresiState extends State<SesPenceresi> {
     super.dispose();
   }
 
+  String _birles(String a, String b) {
+    if (a.isEmpty) return b;
+    if (b.isEmpty) return a;
+    return '$a $b';
+  }
+
   void _bitir() {
     if (_kapandi) return;
     _kapandi = true;
     try {
       _sp.stop();
     } catch (_) {}
-    if (mounted) Navigator.of(context).pop(_metin.trim());
+    final son = _birles(_biriken, _gecici).trim();
+    if (mounted) Navigator.of(context).pop(son.isEmpty ? _metin.trim() : son);
   }
 
   void _basarisiz(String m) {
     if (!mounted || _kapandi) return;
-    if (_metin.trim().isNotEmpty) {
+    if (_birles(_biriken, _gecici).trim().isNotEmpty) {
       _bitir();
       return;
     }
@@ -3061,26 +3169,91 @@ class _SesPenceresiState extends State<SesPenceresi> {
     });
   }
 
+  // Bir dinleme oturumu bitti. Konuşma sürüyor olabilir: yeniden dinle.
+  // Art arda sessiz bir oturum olursa (kullanıcı bitirdi) kaydı kapat.
+  void _oturumBitti() {
+    if (_kapandi || !mounted || _bitisIsleniyor) return;
+    _bitisIsleniyor = true;
+    if (_gecici.trim().isNotEmpty) {
+      _biriken = _birles(_biriken, _gecici.trim());
+      _gecici = '';
+      _oturumKelime = true;
+    }
+    if (_biriken.trim().isEmpty) {
+      _basarisiz('Ses duyamadım. Tekrar dene.');
+      return;
+    }
+    setState(() => _metin = _biriken);
+    if (!_oturumKelime) {
+      _bitir();
+      return;
+    }
+    setState(() => _mesaj = 'Devam edebilirsin. Bitirince "Bitti"ye dokun.');
+    Future<void>.delayed(const Duration(milliseconds: 200), _dinle);
+  }
+
+  void _sonuc(SpeechRecognitionResult r) {
+    if (!mounted || _kapandi) return;
+    final w = r.recognizedWords.trim();
+    if (w.isNotEmpty) _oturumKelime = true;
+    setState(() {
+      _gecici = w;
+      _metin = _birles(_biriken, w);
+    });
+    if (r.finalResult) {
+      _biriken = _birles(_biriken, w);
+      _gecici = '';
+      setState(() => _metin = _biriken);
+      _oturumBitti();
+    }
+  }
+
+  Future<void> _dinle() async {
+    if (!mounted || _kapandi) return;
+    _bitisIsleniyor = false;
+    _oturumKelime = false;
+    try {
+      await _sp.listen(
+        onResult: _sonuc,
+        localeId: _loc,
+        listenFor: const Duration(minutes: 3),
+        pauseFor: const Duration(seconds: 10),
+        listenMode: stt.ListenMode.dictation,
+        onSoundLevelChange: (double v) {
+          if (mounted && !_kapandi) setState(() => _seviye = v);
+        },
+      );
+    } catch (_) {
+      _oturumBitti();
+    }
+  }
+
   Future<void> _basla() async {
     if (!mounted) return;
     setState(() {
       _hata = false;
       _metin = '';
+      _biriken = '';
+      _gecici = '';
       _mesaj = 'Hazırlanıyor…';
     });
     bool ok = false;
     try {
       ok = await _sp.initialize(
         onStatus: (s) {
-          if (s == 'done' || s == 'notListening') {
-            if (_metin.trim().isNotEmpty) {
-              _bitir();
-            } else if (!_hata && mounted && !_kapandi) {
-              _basarisiz('Ses duyamadım. Tekrar dene.');
-            }
+          if (s == 'done' || s == 'notListening') _oturumBitti();
+        },
+        onError: (e) {
+          final m = e.errorMsg.toLowerCase();
+          if (m.contains('permission') ||
+              m.contains('network') ||
+              m.contains('server') ||
+              m.contains('language')) {
+            _basarisiz('Anlayamadım. Tekrar dene.');
+          } else {
+            _oturumBitti();
           }
         },
-        onError: (e) => _basarisiz('Anlayamadım. Tekrar dene.'),
       );
     } catch (_) {
       ok = false;
@@ -3090,30 +3263,17 @@ class _SesPenceresiState extends State<SesPenceresi> {
           'Mikrofon izni verilmedi ya da ses tanıma kapalı. Telefon ayarlarından izin ver.');
       return;
     }
-    String? loc;
     try {
       final l = await _sp.locales();
       for (final x in l) {
         if (x.localeId.toLowerCase().replaceAll('-', '_') == 'tr_tr') {
-          loc = x.localeId;
+          _loc = x.localeId;
         }
       }
     } catch (_) {}
     if (!mounted || _kapandi) return;
     setState(() => _mesaj = 'Dinliyorum… konuş');
-    await _sp.listen(
-      onResult: (SpeechRecognitionResult r) {
-        if (!mounted || _kapandi) return;
-        setState(() => _metin = r.recognizedWords);
-        if (r.finalResult && _metin.trim().isNotEmpty) _bitir();
-      },
-      localeId: loc,
-      listenFor: const Duration(seconds: 40),
-      pauseFor: const Duration(seconds: 3),
-      onSoundLevelChange: (double v) {
-        if (mounted && !_kapandi) setState(() => _seviye = v);
-      },
-    );
+    await _dinle();
   }
 
   @override
