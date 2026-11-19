@@ -9,11 +9,15 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var kanal: MethodChannel? = null
     private var bekliyor = false
+    private var notlarBekliyor = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (intent?.action == "com.hatirlatici.SESLI") {
             bekliyor = true
+            setIntent(Intent(Intent.ACTION_MAIN))
+        } else if (intent?.action == "com.hatirlatici.NOTLAR") {
+            notlarBekliyor = true
             setIntent(Intent(Intent.ACTION_MAIN))
         }
     }
@@ -25,6 +29,10 @@ class MainActivity : FlutterActivity() {
             if (call.method == "sesliMi") {
                 val b = bekliyor
                 bekliyor = false
+                result.success(b)
+            } else if (call.method == "notlarMi") {
+                val b = notlarBekliyor
+                notlarBekliyor = false
                 result.success(b)
             } else if (call.method == "widgetYenile") {
                 NotWidget.yenile(applicationContext)
@@ -41,6 +49,9 @@ class MainActivity : FlutterActivity() {
         if (intent.action == "com.hatirlatici.SESLI") {
             setIntent(Intent(Intent.ACTION_MAIN))
             kanal?.invokeMethod("sesli", null)
+        } else if (intent.action == "com.hatirlatici.NOTLAR") {
+            setIntent(Intent(Intent.ACTION_MAIN))
+            kanal?.invokeMethod("notlar", null)
         } else {
             setIntent(intent)
         }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_kok"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_arka_koyu"
@@ -19,8 +20,8 @@
             android:layout_weight="1"
             android:paddingStart="4dp"
             android:text="Notlarım"
-            android:textColor="#FFFFFF"
-            android:textSize="17sp"
+            android:textColor="#F2F4FF"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <ImageView
@@ -48,6 +49,6 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="Not yok. Mikrofona dokun ve konuş."
-        android:textColor="#9AA3D6"
+        android:textColor="#8E96B8"
         android:textSize="14sp" />
 </LinearLayout>

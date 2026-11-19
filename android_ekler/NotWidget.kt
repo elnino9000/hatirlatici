@@ -113,6 +113,7 @@ class NotWidget : AppWidgetProvider() {
             v.setOnClickPendingIntent(R.id.widget_mic, micPi)
 
             val ac = Intent(context, MainActivity::class.java).apply {
+                action = "com.hatirlatici.NOTLAR"
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
             val acPi = PendingIntent.getActivity(
@@ -120,6 +121,8 @@ class NotWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             v.setOnClickPendingIntent(R.id.widget_baslik, acPi)
+            v.setOnClickPendingIntent(R.id.widget_bos, acPi)
+            v.setOnClickPendingIntent(R.id.widget_kok, acPi)
 
             mgr.updateAppWidget(id, v)
         }

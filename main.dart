@@ -1622,6 +1622,7 @@ class _AnaSayfaState extends State<AnaSayfa>
     yenileSinyali.addListener(_yukle);
     _kanal.setMethodCallHandler((c) async {
       if (c.method == 'sesli') _hizliKayit();
+      if (c.method == 'notlar' && mounted) setState(() => _sekme = 1);
     });
     _baslat();
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _nabiz());
@@ -1671,6 +1672,10 @@ class _AnaSayfaState extends State<AnaSayfa>
           await konus('Hatırlatma. ${p.substring(i + 1)}');
         }
       }
+    } catch (_) {}
+    try {
+      final nt = await _kanal.invokeMethod<bool>('notlarMi') ?? false;
+      if (nt && mounted) setState(() => _sekme = 1);
     } catch (_) {}
     try {
       final sesli = await _kanal.invokeMethod<bool>('sesliMi') ?? false;
