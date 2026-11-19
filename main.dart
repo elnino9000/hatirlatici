@@ -250,7 +250,8 @@ DateTime gunEkle(DateTime d, int k) => DateTime(d.year, d.month, d.day + k);
 class Parsed {
   final String title;
   final DateTime? when;
-  Parsed(this.title, this.when);
+  final bool saatVar; // false: yalnızca gün söylendi, saat varsayıldı
+  Parsed(this.title, this.when, [this.saatVar = true]);
 }
 
 String trLower(String s) {
@@ -427,6 +428,8 @@ const Map<String, String> _bolumler = {
   'öğle': 'ogle',
   'öğlen': 'ogle',
   'öğleyin': 'ogle',
+  'öğlene': 'ogle',
+  'geceye': 'gece',
   'akşam': 'aksam',
   'akşamleyin': 'aksam',
   'akşamüstü': 'aksam',
@@ -434,7 +437,13 @@ const Map<String, String> _bolumler = {
   'geceleyin': 'gece',
 };
 const Set<String> _zamanBirim = {'dakika', 'dk', 'saat', 'gün', 'hafta', 'ay'};
-const Set<String> _sonraSozu = {'sonra', 'içinde', 'sonrasına'};
+const Set<String> _sonraSozu = {
+  'sonra',
+  'içinde',
+  'sonrasına',
+  'sonraya',
+  'sonrasında',
+};
 const Set<String> _ayGunEki = {'inde', 'ında', 'unda', 'ünde', 'sinde', 'sında'};
 final RegExp _saatDk = RegExp(r'^(\d{1,2})[:.](\d{2})$');
 final RegExp _sayiRe = RegExp(r'^\d{1,2}$');
@@ -484,7 +493,26 @@ _Say? _sayiOku(List<String> w, int i, List<bool> used) {
   return _Say(r.v, 1, r.sx, true);
 }
 
+bool _sonSaatYok = false;
+
+// Konuşma tanıma çıktısındaki yazım farklarını düzeltir:
+// "10 a", "21.15 e", "21:30 da" -> "10'a" ...; "buçuğa" -> "buçuk"
+String _trNormalize(String raw) {
+  var t = raw.replaceAll('’', "'");
+  t = t.replaceAllMapped(
+      RegExp(r'(\d{1,2}(?:[.:]\d{2})?)\s+(de|da|te|ta|den|dan|e|a|ye|ya)(?=\s|$|[,.;])'),
+      (m) => "${m[1]}'${m[2]}");
+  t = t.replaceAllMapped(RegExp(r'[Bb]uçuğ[a-zçğıöşü]*'), (m) => 'buçuk');
+  return t;
+}
+
 Parsed parseTr(String raw, DateTime now) {
+  _sonSaatYok = false;
+  final p = _parseTrIc(_trNormalize(raw), now);
+  return Parsed(p.title, p.when, !_sonSaatYok);
+}
+
+Parsed _parseTrIc(String raw, DateTime now) {
   final temiz = raw.replaceAll('’', "'").replaceAll(',', ' ');
   final orig = <String>[];
   final glue = <bool>[];
@@ -629,7 +657,10 @@ Parsed parseTr(String raw, DateTime now) {
     if (t == 'bugün' || t == 'bugun') {
       dayoff = 0;
       used[i] = true;
-    } else if (t == 'yarın') {
+    } else if (t == 'yarından' && nx(i) == 'sonra') {
+      dayoff = 2;
+      used[i] = used[i + 1] = true;
+    } else if (t == 'yarın' || t == 'yarına' || t == 'yarınki') {
       dayoff = 1;
       used[i] = true;
     } else if (t == 'öbür' && nx(i) == 'gün') {
@@ -752,7 +783,7 @@ Parsed parseTr(String raw, DateTime now) {
         mm = 30;
         used[j] = true;
         j++;
-      } else if (nxj(0) == 'çeyrek' && nxj(1) == 'var') {
+      } else if (nxj(0) == 'çeyrek' && (nxj(1) == 'var' || nxj(1) == 'kala')) {
         hh = (hh - 1 + 24) % 24;
         mm = 45;
         used[j] = used[j + 1] = true;
@@ -771,7 +802,7 @@ Parsed parseTr(String raw, DateTime now) {
               used[k] = true;
             }
             j += r2.c + 1;
-          } else if (sonraki == 'var') {
+          } else if (sonraki == 'var' || sonraki == 'kala') {
             hh = (hh - 1 + 24) % 24;
             mm = 60 - r2.v;
             for (int k = j; k <= j + r2.c; k++) {
@@ -872,6 +903,7 @@ Parsed parseTr(String raw, DateTime now) {
   int mm;
   if (hour == null && period == null) {
     if (date == null) return Parsed(title, null);
+    _sonSaatYok = true;
     hh = 9;
     mm = 0;
   } else if (hour == null) {
@@ -909,6 +941,9 @@ Parsed parseTr(String raw, DateTime now) {
     } else if (period == 'ogleden' && hh < 12) {
       hh += 12;
     } else if (period == 'ogle' && hh >= 1 && hh <= 6) {
+      hh += 12;
+    } else if (period == null && hh >= 1 && hh <= 5) {
+      // "saat 3'te" -> 15:00 (kimse gece 3'e alarm kurmaz; gece için "gece 3" denir)
       hh += 12;
     }
   }
@@ -1353,7 +1388,8 @@ class Girdi {
   final String baslik;
   final DateTime? zaman;
   final int niyet; // 0 belirsiz, 1 not, 2 hatırlatma
-  Girdi(this.ham, this.baslik, this.zaman, [this.niyet = 0]);
+  final bool saatVar;
+  Girdi(this.ham, this.baslik, this.zaman, [this.niyet = 0, this.saatVar = true]);
 }
 
 // "not ekle / not yaz / kayıt et / deftere yaz ..." -> NOT
@@ -1469,7 +1505,7 @@ List<Girdi> girdiCoz(String raw, DateTime now) {
         if (nv.tur == 1) {
           return Girdi(nv.metin, trBuyuk(nv.metin), null, 1);
         }
-        return Girdi(nv.metin, p.title, p.when, nv.tur);
+        return Girdi(nv.metin, p.title, p.when, nv.tur, p.saatVar);
       })
       .toList();
 }
@@ -2053,8 +2089,8 @@ class _AnaSayfaState extends State<AnaSayfa>
         await _onay('Nota eklendi', n.text);
         return;
       }
-      if (p.title.trim().isEmpty || z.isBefore(simdi)) {
-        // Saati anlayamadım: normal düzenleme penceresiyle sor
+      if (p.title.trim().isEmpty || z.isBefore(simdi) || !gs.first.saatVar) {
+        // Saati anlayamadım ya da söylenmedi: normal düzenleme penceresiyle sor
         await _duzenle(baslik: p.title, zaman: p.when, duyulan: metin);
         return;
       }
