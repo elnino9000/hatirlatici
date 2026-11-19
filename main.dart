@@ -148,6 +148,69 @@ class Store {
   }
 }
 
+class Not {
+  int id;
+  String text;
+  int createdMs;
+  bool done;
+  int doneMs;
+  Not({
+    required this.id,
+    required this.text,
+    required this.createdMs,
+    this.done = false,
+    this.doneMs = 0,
+  });
+
+  DateTime get created => DateTime.fromMillisecondsSinceEpoch(createdMs);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'text': text,
+        'createdMs': createdMs,
+        'done': done,
+        'doneMs': doneMs,
+      };
+
+  factory Not.fromJson(Map<String, dynamic> j) => Not(
+        id: (j['id'] as num).toInt(),
+        text: j['text'] as String,
+        createdMs: (j['createdMs'] as num).toInt(),
+        done: (j['done'] as bool?) ?? false,
+        doneMs: ((j['doneMs'] as num?) ?? 0).toInt(),
+      );
+}
+
+class NotStore {
+  static const _k = 'notlar_v1';
+  static const _sakla = Duration(days: 7);
+
+  static Future<List<Not>> load() async {
+    final p = await SharedPreferences.getInstance();
+    await p.reload();
+    final raw = p.getString(_k);
+    if (raw == null) return [];
+    try {
+      final simdi = DateTime.now().millisecondsSinceEpoch;
+      final l = jsonDecode(raw) as List;
+      return l
+          .map((e) => Not.fromJson(Map<String, dynamic>.from(e as Map)))
+          .where((n) => !n.done || simdi - n.doneMs < _sakla.inMilliseconds)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> save(List<Not> l) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_k, jsonEncode(l.map((e) => e.toJson()).toList()));
+    try {
+      await const MethodChannel('hatirlatici/hizli').invokeMethod('widgetYenile');
+    } catch (_) {}
+  }
+}
+
 // ---------------------------------------------------------------- yardımcılar
 
 String hhmm(DateTime d) =>
@@ -1178,6 +1241,8 @@ class AnaSayfa extends StatefulWidget {
 class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
   static const MethodChannel _kanal = MethodChannel('hatirlatici/hizli');
   bool _hizliAcik = false;
+  int _sekme = 0;
+  List<Not> notlar = [];
   List<Hat> items = [];
   Timer? _timer;
   final Set<String> _okundu = {};
@@ -1215,8 +1280,12 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
 
   Future<void> _baslat() async {
     final l = await Store.load();
+    final nl = await NotStore.load();
     if (!mounted) return;
-    setState(() => items = l);
+    setState(() {
+      items = l;
+      notlar = nl;
+    });
     await hepsiniYenidenKur(l);
     await _saglikKontrol();
     // Bildirime dokunarak açıldıysa başlığı sesli oku
@@ -1250,8 +1319,12 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
 
   Future<void> _yukle() async {
     final l = await Store.load();
+    final nl = await NotStore.load();
     if (!mounted) return;
-    setState(() => items = l);
+    setState(() {
+      items = l;
+      notlar = nl;
+    });
   }
 
   Future<void> _saglikKontrol() async {
@@ -1346,22 +1419,35 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     );
     if (metin == null || metin.trim().isEmpty || !mounted) return;
     final p = parseTr(metin, DateTime.now());
+    if (p.when == null) {
+      // Saat söylenmedi: not olarak sakla
+      final n = await _notEkle(trBuyuk(metin.trim()));
+      _notBildir(n);
+      return;
+    }
     await _duzenle(
       baslik: p.title,
       zaman: p.when,
       duyulan: metin,
+      notOlabilir: true,
     );
   }
 
   Future<void> _elleEkle() async {
-    await _duzenle(baslik: '', zaman: null, duyulan: null);
+    if (_sekme == 1) {
+      await _notDialog();
+      return;
+    }
+    await _duzenle(
+        baslik: '', zaman: null, duyulan: null, notOlabilir: true);
   }
 
-  Future<void> _duzenle({
+  Future<Hat?> _duzenle({
     required String baslik,
     required DateTime? zaman,
     String? duyulan,
     Hat? mevcut,
+    bool notOlabilir = false,
   }) async {
     final d = await showModalBottomSheet<Taslak>(
       context: context,
@@ -1371,10 +1457,122 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         zaman: zaman,
         erken: mevcut?.early,
         duyulan: duyulan,
+        notOlabilir: notOlabilir,
       ),
     );
-    if (d == null) return;
-    await _taslagiKaydet(d, mevcut);
+    if (d == null) return null;
+    if (d.not) {
+      final n = await _notEkle(d.baslik);
+      _notBildir(n);
+      return null;
+    }
+    return _taslagiKaydet(d, mevcut);
+  }
+
+  // ------------------------------------------------------------ notlar
+
+  Future<Not> _notEkle(String metin) async {
+    final l = await NotStore.load();
+    final n = Not(
+      id: await Store.nextId(),
+      text: metin.trim(),
+      createdMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    l.add(n);
+    await NotStore.save(l);
+    if (mounted) setState(() => notlar = l);
+    return n;
+  }
+
+  void _notBildir(Not n) {
+    if (!mounted) return;
+    setState(() => _sekme = 1);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Nota eklendi'),
+      action: SnackBarAction(
+        label: 'Saat ekle',
+        onPressed: () => _notuHatirlatmayaCevir(n),
+      ),
+    ));
+  }
+
+  Future<void> _notBitir(Not n, bool deger) async {
+    final l = await NotStore.load();
+    final i = l.indexWhere((e) => e.id == n.id);
+    if (i < 0) return;
+    l[i].done = deger;
+    l[i].doneMs = deger ? DateTime.now().millisecondsSinceEpoch : 0;
+    await NotStore.save(l);
+    if (mounted) setState(() => notlar = l);
+  }
+
+  Future<void> _notYapildi(Not n) async {
+    n.done = true;
+    n.doneMs = DateTime.now().millisecondsSinceEpoch;
+    setState(() {});
+    final l = await NotStore.load();
+    final i = l.indexWhere((e) => e.id == n.id);
+    if (i >= 0) {
+      l[i].done = true;
+      l[i].doneMs = n.doneMs;
+      await NotStore.save(l);
+    }
+    if (!mounted) return;
+    setState(() => notlar = l);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Yapıldı'),
+      action: SnackBarAction(
+        label: 'Geri al',
+        onPressed: () => _notBitir(n, false),
+      ),
+    ));
+  }
+
+  Future<void> _notDialog({Not? mevcut}) async {
+    final c = TextEditingController(text: mevcut?.text ?? '');
+    final sonuc = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kYuzey,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+        title: Text(mevcut == null ? 'Yeni not' : 'Notu düzenle'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 6,
+          textCapitalization: TextCapitalization.sentences,
+          style: const TextStyle(fontSize: 18),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(c.text.trim()),
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    c.dispose();
+    if (sonuc == null || sonuc.isEmpty) return;
+    if (mevcut == null) {
+      await _notEkle(sonuc);
+      return;
+    }
+    final l = await NotStore.load();
+    final i = l.indexWhere((e) => e.id == mevcut.id);
+    if (i < 0) return;
+    l[i].text = sonuc;
+    await NotStore.save(l);
+    if (mounted) setState(() => notlar = l);
+  }
+
+  Future<void> _notuHatirlatmayaCevir(Not n) async {
+    final h = await _duzenle(baslik: n.text, zaman: null);
+    if (h != null) await _notBitir(n, true);
   }
 
   Future<Hat> _taslagiKaydet(Taslak d, Hat? mevcut, {bool sessiz = false}) async {
@@ -1418,6 +1616,25 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     return h;
   }
 
+  Future<void> _onay(String ust, String alt) async {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        backgroundColor: kYuzey,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        icon: const Icon(Icons.check_circle, size: 48, color: kYesil),
+        title: Text(ust,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+        content: Text(alt,
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 2200));
+  }
+
   // Ana ekran widget'ından: dinle, anladıysa kur, kapanıp ana ekrana dön
   Future<void> _hizliKayit() async {
     if (_hizliAcik || !mounted) return;
@@ -1432,7 +1649,12 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       final simdi = DateTime.now();
       final p = parseTr(metin, simdi);
       final z = p.when;
-      if (z == null || p.title.trim().isEmpty || z.isBefore(simdi)) {
+      if (z == null) {
+        final n = await _notEkle(trBuyuk(metin.trim()));
+        await _onay('Nota eklendi', n.text);
+        return;
+      }
+      if (p.title.trim().isEmpty || z.isBefore(simdi)) {
         // Saati anlayamadım: normal düzenleme penceresiyle sor
         await _duzenle(baslik: p.title, zaman: p.when, duyulan: metin);
         return;
@@ -1440,22 +1662,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       final erken = z.difference(simdi) >= const Duration(hours: 36);
       final h = await _taslagiKaydet(Taslak(p.title.trim(), z, erken), null,
           sessiz: true);
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (c) => AlertDialog(
-          backgroundColor: kYuzey,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          icon: const Icon(Icons.check_circle, size: 48, color: kYesil),
-          title: Text(h.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-          content: Text('Kuruldu: ${zamanYazisi(h.when, DateTime.now())}',
-              textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
-        ),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 2200));
+      await _onay(h.title, 'Kuruldu: ${zamanYazisi(h.when, DateTime.now())}');
     } finally {
       _hizliAcik = false;
       await SystemNavigator.pop();
@@ -1922,6 +2129,203 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     );
   }
 
+  Widget _sekmeler(int hs, int ns) {
+    Widget pil(int i, String ad, int sayi) {
+      final secili = _sekme == i;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _sekme = i),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: secili ? kMor : kYuzey,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$ad${sayi > 0 ? '  $sayi' : ''}',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: secili ? Colors.white : kSoluk,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+      child: Row(
+        children: [
+          pil(0, 'Hatırlatmalar', hs),
+          const SizedBox(width: 10),
+          pil(1, 'Notlar', ns),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _notlarGovde(DateTime now) {
+    final aktif = notlar.where((e) => !e.done).toList()
+      ..sort((a, b) => b.createdMs.compareTo(a.createdMs));
+    final biten = notlar.where((e) => e.done).toList()
+      ..sort((a, b) => b.doneMs.compareTo(a.doneMs));
+    if (aktif.isEmpty && biten.isEmpty) return [_notBos()];
+    final w = <Widget>[const SizedBox(height: 6)];
+    for (final n in aktif) {
+      w.add(_notSatir(n, now));
+    }
+    if (aktif.isEmpty) {
+      w.add(const Padding(
+        padding: EdgeInsets.fromLTRB(32, 30, 32, 10),
+        child: Text('Bekleyen not yok.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: kSoluk)),
+      ));
+    }
+    if (biten.isNotEmpty) {
+      w.add(Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 26),
+            iconColor: kSoluk,
+            collapsedIconColor: kSoluk,
+            title: Text('YAPILANLAR (${biten.length})',
+                style: const TextStyle(
+                    fontSize: 13,
+                    letterSpacing: 0.6,
+                    fontWeight: FontWeight.w700,
+                    color: kSoluk)),
+            subtitle: const Text('7 gün saklanır, dokununca geri gelir',
+                style: TextStyle(fontSize: 12, color: kSoluk)),
+            children: biten
+                .map((n) => Padding(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18)),
+                        tileColor: kYuzey,
+                        title: Text(n.text,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: kSoluk,
+                                decoration: TextDecoration.lineThrough)),
+                        trailing: const Icon(Icons.undo, color: kSoluk),
+                        onTap: () => _notBitir(n, false),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+      ));
+    }
+    return w;
+  }
+
+  Widget _notBos() {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(32, 56, 32, 0),
+      child: Column(
+        children: [
+          Icon(Icons.sticky_note_2_outlined, size: 72, color: kSoluk),
+          SizedBox(height: 18),
+          Text('Henüz not yok',
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
+          SizedBox(height: 8),
+          Text(
+            'Mikrofona bas ve saat söylemeden konuş, not olarak saklanır. '
+            'Saat söylersen alarm kurulur.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: kSoluk),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _notSatir(Not n, DateTime now) {
+    final yas = gunFarki(now, n.created);
+    final Color renk = yas <= 0 ? kMavi : (yas <= 2 ? kSari : kKirmizi);
+    final String etiket = yas <= 0 ? 'Bugün' : (yas == 1 ? 'Dün' : '$yas gün önce');
+    return Dismissible(
+      key: ValueKey('n${n.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: kYesil.withOpacity(0.22),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 26),
+        child: const Icon(Icons.check, color: kYesil),
+      ),
+      onDismissed: (_) => _notYapildi(n),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Material(
+          color: kYuzey,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _notDialog(mevcut: n),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 5, color: renk),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 4, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(n.text,
+                              maxLines: 6,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white)),
+                          const SizedBox(height: 4),
+                          Text(etiket,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: yas <= 0 ? kSoluk : renk)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Hatırlatma kur',
+                    icon: const Icon(Icons.alarm_add_outlined,
+                        color: kSoluk, size: 24),
+                    onPressed: () => _notuHatirlatmayaCevir(n),
+                  ),
+                  IconButton(
+                    tooltip: 'Yapıldı',
+                    icon: Icon(Icons.radio_button_unchecked,
+                        color: renk, size: 28),
+                    onPressed: () => _notYapildi(n),
+                  ),
+                  const SizedBox(width: 2),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _daire({
     required double boy,
     required Widget child,
@@ -1996,7 +2400,10 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
         ),
       ));
     }
-    if (aktif.isEmpty && bitenler.isEmpty) {
+    govde.add(_sekmeler(aktif.length, notlar.where((e) => !e.done).length));
+    if (_sekme == 1) {
+      govde.addAll(_notlarGovde(now));
+    } else if (aktif.isEmpty && bitenler.isEmpty) {
       govde.add(_bos());
     } else {
       if (sirada != null) govde.add(_hero(sirada, now));
@@ -2271,7 +2678,8 @@ class Taslak {
   final String baslik;
   final DateTime zaman;
   final bool erken;
-  Taslak(this.baslik, this.zaman, this.erken);
+  final bool not;
+  Taslak(this.baslik, this.zaman, this.erken, {this.not = false});
 }
 
 class DuzenlePenceresi extends StatefulWidget {
@@ -2279,12 +2687,14 @@ class DuzenlePenceresi extends StatefulWidget {
   final DateTime? zaman;
   final bool? erken;
   final String? duyulan;
+  final bool notOlabilir;
   const DuzenlePenceresi({
     super.key,
     required this.baslik,
     required this.zaman,
     this.erken,
     this.duyulan,
+    this.notOlabilir = false,
   });
 
   @override
@@ -2456,6 +2866,20 @@ class _DuzenlePenceresiState extends State<DuzenlePenceresi> {
                   _erkenElle = true;
                 }),
               ),
+              if (widget.notOlabilir)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.sticky_note_2_outlined, size: 18),
+                    label: const Text('Saat yok, not olarak sakla'),
+                    onPressed: _c.text.trim().isEmpty
+                        ? null
+                        : () => Navigator.of(context).pop(
+                              Taslak(_c.text.trim(), DateTime.now(), false,
+                                  not: true),
+                            ),
+                  ),
+                ),
               const SizedBox(height: 6),
               Row(
                 children: [

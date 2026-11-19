@@ -26,6 +26,9 @@ class MainActivity : FlutterActivity() {
                 val b = bekliyor
                 bekliyor = false
                 result.success(b)
+            } else if (call.method == "widgetYenile") {
+                NotWidget.yenile(applicationContext)
+                result.success(null)
             } else {
                 result.notImplemented()
             }

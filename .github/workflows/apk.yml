@@ -52,6 +52,13 @@ jobs:
                   </intent-filter>
                   <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_hizli_info"/>
               </receiver>
+              <receiver android:name=".NotWidget" android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                  </intent-filter>
+                  <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_not_info"/>
+              </receiver>
+              <service android:name=".NotServis" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS" />
           '''
           m = m.replace('</application>', rec + '</application>', 1)
           m = m.replace('<activity', '<activity android:showWhenLocked="true" android:turnScreenOn="true"', 1)
@@ -85,6 +92,8 @@ jobs:
           mkdir -p $d
           cp android_ekler/MainActivity.kt $d/MainActivity.kt
           cp android_ekler/HizliWidget.kt $d/HizliWidget.kt
+          cp android_ekler/NotWidget.kt $d/NotWidget.kt
+          cp android_ekler/NotServis.kt $d/NotServis.kt
           find android/app/src/main -name 'MainActivity.java' -delete
           cp -r android_ekler/res/. android/app/src/main/res/
       - run: flutter pub get
