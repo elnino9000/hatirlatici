@@ -358,6 +358,7 @@ const List<MapEntry<String, int>> _aylar = [
   MapEntry('aralık', 12),
 ];
 const Set<String> _dolgu = {
+  'doğru',
   'bunu',
   'şunu',
   'onu',
@@ -1505,7 +1506,12 @@ List<Girdi> girdiCoz(String raw, DateTime now) {
         if (nv.tur == 1) {
           return Girdi(nv.metin, trBuyuk(nv.metin), null, 1);
         }
-        return Girdi(nv.metin, p.title, p.when, nv.tur, p.saatVar);
+        var baslik = p.title;
+        if (baslik == 'Hatırlatıcı') {
+          // içerik söylenmedi: "alarm kur" ise Alarm, değilse boş bırak (sorulur)
+          baslik = trLower(g).contains('alarm') ? 'Alarm' : '';
+        }
+        return Girdi(nv.metin, baslik, p.when, nv.tur, p.saatVar);
       })
       .toList();
 }
@@ -1815,10 +1821,10 @@ class _AnaSayfaState extends State<AnaSayfa>
     final simdi = DateTime.now();
     for (final g in gs) {
       final z = g.zaman;
-      if (g.niyet != 1 && z != null && z.isAfter(simdi) && g.baslik.trim().isNotEmpty) {
+      if (g.niyet != 1 && z != null && z.isAfter(simdi)) {
         final erken = z.difference(simdi) >= const Duration(hours: 36);
-        await _taslagiKaydet(Taslak(g.baslik.trim(), z, erken), null,
-            sessiz: true);
+        final b = g.baslik.trim().isEmpty ? 'Hatırlatma' : g.baslik.trim();
+        await _taslagiKaydet(Taslak(b, z, erken), null, sessiz: true);
         hat++;
       } else {
         await _notEkle(trBuyuk(notTemizle(g.ham)));
