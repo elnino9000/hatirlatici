@@ -48,7 +48,7 @@ void main() {
     ["saat 5'e bunu hatırlat", ''],
     ["yarın saat 9'da bankaya git alarm kur", 'ALARM[11-20 09:00] "Bankaya git"'],
     ['yarın saat 10 a alarm ayarla toptancıyı ara', 'ALARM[11-20 10:00] "Toptancıyı ara" kat=Arama'],
-    ['Çerezci 13.00019 TL', 'NOT[] "Çerezci 13.019 ₺" kat=Gider tutar=13019.0'],
+    ['Çerezci 13.00019 TL', 'NOT[-] "Çerezci 13.019 TL" kat=Gider tutar=13.019 ₺'],
     ['Çerezci 13000 19 TL', ''],
     ['Konfetici 23.256 TL', ''],
     ["akşam 8'de ilaç içmemi hatırlat", ''],
