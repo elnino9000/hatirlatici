@@ -93,10 +93,11 @@ class NotWidget : AppWidgetProvider() {
             v.setRemoteAdapter(R.id.widget_liste, servis)
             v.setEmptyView(R.id.widget_liste, R.id.widget_bos)
 
-            val sablon = Intent(context, NotWidget::class.java).apply {
-                action = "com.hatirlatici.NOT_BITTI"
+            val sablon = Intent(context, MainActivity::class.java).apply {
+                action = "com.hatirlatici.NOTLAR"
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
-            val sablonPi = PendingIntent.getBroadcast(
+            val sablonPi = PendingIntent.getActivity(
                 context, 1, sablon,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
