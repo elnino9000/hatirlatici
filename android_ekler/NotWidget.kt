@@ -79,6 +79,15 @@ class NotWidget : AppWidgetProvider() {
     }
 
     companion object {
+        fun notlarIntent(context: Context): Intent {
+            val i = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?: Intent(context, MainActivity::class.java)
+            i.action = "com.hatirlatici.NOTLAR"
+            i.putExtra("git", "notlar")
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            return i
+        }
+
         fun yenile(context: Context) {
             val m = AppWidgetManager.getInstance(context)
             val ids = m.getAppWidgetIds(ComponentName(context, NotWidget::class.java))
@@ -93,10 +102,7 @@ class NotWidget : AppWidgetProvider() {
             v.setRemoteAdapter(R.id.widget_liste, servis)
             v.setEmptyView(R.id.widget_liste, R.id.widget_bos)
 
-            val sablon = Intent(context, MainActivity::class.java).apply {
-                action = "com.hatirlatici.NOTLAR"
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
+            val sablon = notlarIntent(context)
             val sablonPi = PendingIntent.getActivity(
                 context, 1, sablon,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -113,12 +119,8 @@ class NotWidget : AppWidgetProvider() {
             )
             v.setOnClickPendingIntent(R.id.widget_mic, micPi)
 
-            val ac = Intent(context, MainActivity::class.java).apply {
-                action = "com.hatirlatici.NOTLAR"
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
             val acPi = PendingIntent.getActivity(
-                context, 3, ac,
+                context, 3, notlarIntent(context),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             v.setOnClickPendingIntent(R.id.widget_baslik, acPi)

@@ -51,6 +51,8 @@ void main() {
     ['Çerezci 13.00019 TL', 'NOT[-] "Çerezci 13.019 TL" kat=Gider tutar=13.019 ₺'],
     ['Çerezci 13000 19 TL', ''],
     ['Konfetici 23.256 TL', ''],
+    ['yarın eve ekmek al', ''],
+    ['yarın eve ekmek al hatırlat', ''],
     ["akşam 8'de ilaç içmemi hatırlat", ''],
     ["bana yarın sabah 7'de uyar", ''],
     ["cuma günü saat 14.30'da randevu hatırlat", ''],

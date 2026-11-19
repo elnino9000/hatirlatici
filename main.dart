@@ -1339,6 +1339,9 @@ double? _kelimeTutar(String t) {
   return null;
 }
 
+// Notlar muhasebe değil: toplam/tutar rozetleri kapalı
+const bool kNotToplamGoster = false;
+
 double? tutarBul(String metin) {
   final t = trLower(metin).replaceAll('₺', ' tl ');
   final re = RegExp(
@@ -1826,7 +1829,8 @@ class _AnaSayfaState extends State<AnaSayfa>
       return;
     }
     final g = gs.first;
-    if (g.niyet == 1 || (g.zaman == null && g.niyet == 0)) {
+    if (g.niyet == 1 ||
+        (g.niyet == 0 && (g.zaman == null || !g.saatVar))) {
       // "not ekle" dendi ya da saat söylenmedi: not olarak sakla
       final n = await _notEkle(trBuyuk(notTemizle(g.ham)));
       _notBildir(n);
@@ -1847,7 +1851,10 @@ class _AnaSayfaState extends State<AnaSayfa>
     final simdi = DateTime.now();
     for (final g in gs) {
       final z = g.zaman;
-      if (g.niyet != 1 && z != null && z.isAfter(simdi)) {
+      if (g.niyet != 1 &&
+          z != null &&
+          z.isAfter(simdi) &&
+          (g.niyet == 2 || g.saatVar)) {
         final erken = z.difference(simdi) >= const Duration(hours: 36);
         final b = g.baslik.trim().isEmpty ? 'Hatırlatma' : g.baslik.trim();
         await _taslagiKaydet(Taslak(b, z, erken), null, sessiz: true);
@@ -2139,6 +2146,12 @@ class _AnaSayfaState extends State<AnaSayfa>
           await _duzenle(baslik: p.title, zaman: null, duyulan: metin);
           return;
         }
+        final n = await _notEkle(trBuyuk(notTemizle(gs.first.ham)));
+        await _onay('Nota eklendi', n.text);
+        return;
+      }
+      if (gs.first.niyet == 0 && !gs.first.saatVar) {
+        // Sadece gün söylendi, "hatırlat/alarm" denmedi: not olarak sakla
         final n = await _notEkle(trBuyuk(notTemizle(gs.first.ham)));
         await _onay('Nota eklendi', n.text);
         return;
@@ -2741,7 +2754,7 @@ class _AnaSayfaState extends State<AnaSayfa>
         say++;
       }
     }
-    if (say > 0) {
+    if (kNotToplamGoster && say > 0) {
       w.add(Container(
         margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
@@ -2885,7 +2898,7 @@ class _AnaSayfaState extends State<AnaSayfa>
     final String etiket =
         yas <= 0 ? 'Bugün' : (yas == 1 ? 'Dün' : '$yas gün önce');
     final kat = katBul(n.text) ?? kKatGenel;
-    final tutar = tutarBul(n.text);
+    final double? tutar = kNotToplamGoster ? tutarBul(n.text) : null;
     Widget chip(String t, Color c, {IconData? ikon}) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
