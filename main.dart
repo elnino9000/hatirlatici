@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -26,20 +27,20 @@ final FlutterLocalNotificationsPlugin plugin = FlutterLocalNotificationsPlugin()
 final FlutterTts tts = FlutterTts();
 final ValueNotifier<int> yenileSinyali = ValueNotifier<int>(0);
 
-const kArka = Color(0xFF0A0E1F);
-const kYuzey = Color(0xFF151A33);
-const kYuzey2 = Color(0xFF1E2550);
-const kMor = Color(0xFF7C5CFF);
+const kArka = Color(0xFF070914);
+const kYuzey = Color(0xFF111426);
+const kYuzey2 = Color(0xFF1A1E3A);
+const kMor = Color(0xFF8B5CF6);
 const kMavi = Color(0xFF3D8BFF);
 const kYesil = Color(0xFF2EE6A6);
 const kSari = Color(0xFFFFB84D);
 const kKirmizi = Color(0xFFFF5C6C);
 const kGri = Color(0xFF6B7299);
-const kSoluk = Color(0xFF8E96C7);
+const kSoluk = Color(0xFF9AA2CC);
 const kGradyan = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
-  colors: [kMor, kMavi],
+  colors: [kMor, Color(0xFF4F7CFF), Color(0xFF22D3EE)],
 );
 const _ayTam = [
   'Ocak',
@@ -1555,9 +1556,12 @@ ThemeData _tema() {
     seedColor: kMor,
     brightness: Brightness.dark,
   );
+  final temel = ThemeData(brightness: Brightness.dark, useMaterial3: true);
   return ThemeData(
     useMaterial3: true,
     colorScheme: cs,
+    textTheme: GoogleFonts.plusJakartaSansTextTheme(temel.textTheme)
+        .apply(bodyColor: Colors.white, displayColor: Colors.white),
     scaffoldBackgroundColor: kArka,
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: kYuzey,
@@ -2330,8 +2334,6 @@ class _AnaSayfaState extends State<AnaSayfa>
                                   ),
                                 Text(
                                   h.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w600,
@@ -2549,10 +2551,10 @@ class _AnaSayfaState extends State<AnaSayfa>
             const SizedBox(height: 14),
             Text(
               h.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 26,
+              style: TextStyle(
+                fontSize: h.title.length > 90
+                    ? 18
+                    : (h.title.length > 45 ? 21 : (h.title.length > 24 ? 24 : 28)),
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
                 height: 1.15,
@@ -2828,8 +2830,6 @@ class _AnaSayfaState extends State<AnaSayfa>
                             borderRadius: BorderRadius.circular(18)),
                         tileColor: kYuzey,
                         title: Text(n.text,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 color: kSoluk,
                                 decoration: TextDecoration.lineThrough)),
@@ -2970,8 +2970,6 @@ class _AnaSayfaState extends State<AnaSayfa>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(n.text,
-                              maxLines: 6,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w600,
