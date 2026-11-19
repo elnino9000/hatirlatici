@@ -28,7 +28,6 @@ class NotFabrika(private val ctx: Context) : RemoteViewsService.RemoteViewsFacto
         if (position >= liste.size) return v
         val (id, metin) = liste[position]
         v.setTextViewText(R.id.satir_metin, metin)
-        v.setOnClickFillInIntent(R.id.satir_kok, Intent().putExtra("id", id))
         return v
     }
 

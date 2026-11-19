@@ -1463,7 +1463,28 @@ final RegExp _ayiranlar =
 
 // Tek cümlede birden çok iş varsa ayırır:
 // "yarın 9'da bankaya git ve akşam 6'da market" -> iki ayrı girdi
+// Ses tanıma "on üç bin on dokuz"u "13.00019" veya "13000 19" diye yazabiliyor -> 13.019
+String sayiDuzelt(String t) {
+  String bas(int a, int b) {
+    final v = a * 1000 + b;
+    final s = v.toString();
+    final o = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) o.write('.');
+      o.write(s[i]);
+    }
+    return o.toString();
+  }
+
+  t = t.replaceAllMapped(RegExp(r'(?<![\d.,])(\d{1,3})\.000(\d{1,3})(?![\d])'),
+      (m) => bas(int.parse(m[1]!), int.parse(m[2]!)));
+  t = t.replaceAllMapped(RegExp(r'(?<![\d.,])(\d{1,3})000\s+(\d{1,3})(?=\s*(?:tl|lira|₺))', caseSensitive: false),
+      (m) => bas(int.parse(m[1]!), int.parse(m[2]!)));
+  return t;
+}
+
 List<Girdi> girdiCoz(String raw, DateTime now) {
+  raw = sayiDuzelt(raw);
   final metin = raw.trim();
   final parcalar = <String>[];
   final ayrac = <String>[];
