@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:alarm/alarm.dart' as alm;
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -1175,6 +1176,8 @@ class AnaSayfa extends StatefulWidget {
 }
 
 class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
+  static const MethodChannel _kanal = MethodChannel('hatirlatici/hizli');
+  bool _hizliAcik = false;
   List<Hat> items = [];
   Timer? _timer;
   final Set<String> _okundu = {};
@@ -1185,6 +1188,9 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     yenileSinyali.addListener(_yukle);
+    _kanal.setMethodCallHandler((c) async {
+      if (c.method == 'sesli') _hizliKayit();
+    });
     _baslat();
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _nabiz());
   }
@@ -1193,6 +1199,7 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     yenileSinyali.removeListener(_yukle);
+    _kanal.setMethodCallHandler(null);
     _timer?.cancel();
     super.dispose();
   }
@@ -1225,6 +1232,13 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
           await plugin.cancel(hid * 10 + 3);
           await konus('Hatırlatma. ${p.substring(i + 1)}');
         }
+      }
+    } catch (_) {}
+    try {
+      final sesli = await _kanal.invokeMethod<bool>('sesliMi') ?? false;
+      if (sesli && mounted) {
+        _hizliKayit();
+        return;
       }
     } catch (_) {}
     final sp = await SharedPreferences.getInstance();
@@ -1360,6 +1374,10 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
       ),
     );
     if (d == null) return;
+    await _taslagiKaydet(d, mevcut);
+  }
+
+  Future<Hat> _taslagiKaydet(Taslak d, Hat? mevcut, {bool sessiz = false}) async {
     final l = await Store.load();
     Hat h;
     if (mevcut != null) {
@@ -1390,11 +1408,58 @@ class _AnaSayfaState extends State<AnaSayfa> with WidgetsBindingObserver {
     } catch (e) {
       hata = 'Alarm kurulamadı: $e';
     }
-    if (!mounted) return;
+    if (!mounted) return h;
     setState(() => items = l);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(hata ?? 'Kuruldu: ${zamanYazisi(h.when, DateTime.now())}'),
-    ));
+    if (!sessiz) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(hata ?? 'Kuruldu: ${zamanYazisi(h.when, DateTime.now())}'),
+      ));
+    }
+    return h;
+  }
+
+  // Ana ekran widget'ından: dinle, anladıysa kur, kapanıp ana ekrana dön
+  Future<void> _hizliKayit() async {
+    if (_hizliAcik || !mounted) return;
+    _hizliAcik = true;
+    try {
+      final metin = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const SesPenceresi(),
+      );
+      if (metin == null || metin.trim().isEmpty || !mounted) return;
+      final simdi = DateTime.now();
+      final p = parseTr(metin, simdi);
+      final z = p.when;
+      if (z == null || p.title.trim().isEmpty || z.isBefore(simdi)) {
+        // Saati anlayamadım: normal düzenleme penceresiyle sor
+        await _duzenle(baslik: p.title, zaman: p.when, duyulan: metin);
+        return;
+      }
+      final erken = z.difference(simdi) >= const Duration(hours: 36);
+      final h = await _taslagiKaydet(Taslak(p.title.trim(), z, erken), null,
+          sessiz: true);
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => AlertDialog(
+          backgroundColor: kYuzey,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          icon: const Icon(Icons.check_circle, size: 48, color: kYesil),
+          title: Text(h.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+          content: Text('Kuruldu: ${zamanYazisi(h.when, DateTime.now())}',
+              textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+    } finally {
+      _hizliAcik = false;
+      await SystemNavigator.pop();
+    }
   }
 
   Future<void> _bitti(Hat h, bool deger) async {

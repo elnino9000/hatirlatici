@@ -46,6 +46,12 @@ jobs:
                       <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
                   </intent-filter>
               </receiver>
+              <receiver android:name=".HizliWidget" android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                  </intent-filter>
+                  <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_hizli_info"/>
+              </receiver>
           '''
           m = m.replace('</application>', rec + '</application>', 1)
           m = m.replace('<activity', '<activity android:showWhenLocked="true" android:turnScreenOn="true"', 1)
@@ -73,6 +79,14 @@ jobs:
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             cp icons/$d.png android/app/src/main/res/mipmap-$d/ic_launcher.png
           done
+      - name: Widget dosyalari
+        run: |
+          d=android/app/src/main/kotlin/com/hatirlatici/hatirlatici
+          mkdir -p $d
+          cp android_ekler/MainActivity.kt $d/MainActivity.kt
+          cp android_ekler/HizliWidget.kt $d/HizliWidget.kt
+          find android/app/src/main -name 'MainActivity.java' -delete
+          cp -r android_ekler/res/. android/app/src/main/res/
       - run: flutter pub get
       - run: flutter build apk --release --no-shrink
       - uses: actions/upload-artifact@v4
