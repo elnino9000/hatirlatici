@@ -27,20 +27,20 @@ final FlutterLocalNotificationsPlugin plugin = FlutterLocalNotificationsPlugin()
 final FlutterTts tts = FlutterTts();
 final ValueNotifier<int> yenileSinyali = ValueNotifier<int>(0);
 
-const kArka = Color(0xFF070914);
-const kYuzey = Color(0xFF111426);
-const kYuzey2 = Color(0xFF1A1E3A);
-const kMor = Color(0xFF8B5CF6);
-const kMavi = Color(0xFF3D8BFF);
-const kYesil = Color(0xFF2EE6A6);
+const kArka = Color(0xFF0B0C10);
+const kYuzey = Color(0xFF15171D);
+const kYuzey2 = Color(0xFF1E2129);
+const kMor = Color(0xFF7C6CFF);
+const kMavi = Color(0xFF5B9DFF);
+const kYesil = Color(0xFF3DDC97);
 const kSari = Color(0xFFFFB84D);
 const kKirmizi = Color(0xFFFF5C6C);
-const kGri = Color(0xFF6B7299);
-const kSoluk = Color(0xFF9AA2CC);
+const kGri = Color(0xFF707584);
+const kSoluk = Color(0xFFA3A8B8);
 const kGradyan = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
-  colors: [kMor, Color(0xFF4F7CFF), Color(0xFF22D3EE)],
+  colors: [kMor, Color(0xFF5B8CFF)],
 );
 const _ayTam = [
   'Ocak',
@@ -394,6 +394,15 @@ const Set<String> _dolgu = {
   'hatırla',
   'unutma',
   'diye',
+  // "21.00 küsur", "dokuz küsüre", "9 küsurda" -> saatin yaklaşık söylenişi
+  'küsur',
+  'küsure',
+  'küsüre',
+  'küsuru',
+  'küsurda',
+  'küsurlarda',
+  'küsurunda',
+  'küsüratında',
   'kur',
   'ayarla',
   'alarm',
@@ -1507,7 +1516,14 @@ List<Girdi> girdiCoz(String raw, DateTime now) {
     if (sg.trim().isEmpty) continue;
     final ay = ayrac[i - 1];
     final kendiZamani = parseTr(sg, now).when != null;
-    final yeni = ay == 'bir de' || ay == 'ayrıca' || kendiZamani;
+    // "Hava soğuk, ceketini giy diye yarın 9'da hatırlat": "diye" öncesi ve
+    // zamansız, niyetsiz ön parça tek bir hatırlatma metnidir -> bölme
+    final diyeBagli = RegExp(r'(?<![a-zçğıöşü])diye(?![a-zçğıöşü])')
+            .hasMatch(trLower(sg)) &&
+        parseTr(cur, now).when == null &&
+        niyetBul(cur, now).tur == 0;
+    final yeni =
+        ay == 'bir de' || ay == 'ayrıca' || (kendiZamani && !diyeBagli);
     if (yeni && cur.trim().isNotEmpty) {
       // "yarın ... ve akşam 6'da ..." -> ikinci iş de yarına ait
       if (kendiZamani && !_gunIsareti.hasMatch(trLower(sg))) {
@@ -1563,19 +1579,47 @@ ThemeData _tema() {
     textTheme: GoogleFonts.plusJakartaSansTextTheme(temel.textTheme)
         .apply(bodyColor: Colors.white, displayColor: Colors.white),
     scaffoldBackgroundColor: kArka,
+    splashFactory: InkSparkle.splashFactory,
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.android: ZoomPageTransitionsBuilder(),
+    }),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: kArka,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: kYuzey,
+      surfaceTintColor: Colors.transparent,
       showDragHandle: true,
+      dragHandleColor: Color(0xFF3A3F4C),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: const Color(0xFF262A35),
+      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: kMor,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: kYuzey2,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: kMor.withOpacity(0.7), width: 1.2),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -1583,15 +1627,15 @@ ThemeData _tema() {
         backgroundColor: kMor,
         foregroundColor: Colors.white,
         minimumSize: const Size(0, 52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
         minimumSize: const Size(0, 52),
-        side: const BorderSide(color: Color(0xFF39407A)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        side: const BorderSide(color: Color(0xFF353A47)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     ),
   );
@@ -2455,7 +2499,7 @@ class _AnaSayfaState extends State<AnaSayfa>
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFB9A8FF)),
+                        color: Color(0xFFC4BCFF)),
                   ),
                 ),
               ],
@@ -2471,7 +2515,7 @@ class _AnaSayfaState extends State<AnaSayfa>
                 decoration: BoxDecoration(
                   color: kYuzey,
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF2A3160)),
+                  border: Border.all(color: const Color(0xFF2B2F3A)),
                 ),
                 child: Badge(
                   isLabelVisible: _uyari,
@@ -2641,10 +2685,10 @@ class _AnaSayfaState extends State<AnaSayfa>
               decoration: BoxDecoration(
                 color: kYuzey,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF2A3160)),
+                border: Border.all(color: const Color(0xFF2B2F3A)),
               ),
               child: Text('“$s”',
-                  style: const TextStyle(fontSize: 15, color: Color(0xFFCBD1FF))),
+                  style: const TextStyle(fontSize: 15, color: Color(0xFFD5D8E3))),
             ),
         ],
       ),
@@ -3155,7 +3199,7 @@ class _AnaSayfaState extends State<AnaSayfa>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A2050), kArka],
+            colors: [Color(0xFF1B1D2B), kArka],
             stops: [0.0, 0.5],
           ),
         ),
@@ -3174,7 +3218,7 @@ class _AnaSayfaState extends State<AnaSayfa>
           _daire(
             boy: 58,
             renk: kYuzey2,
-            kenar: Border.all(color: const Color(0xFF39407A)),
+            kenar: Border.all(color: const Color(0xFF353A47)),
             onTap: _elleEkle,
             child: const Icon(Icons.edit_outlined, color: Colors.white, size: 24),
           ),

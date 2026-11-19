@@ -111,6 +111,15 @@ void main() {
     ['süt ve ekmek al', 'NOT[-] "Süt ve ekmek al" kat=Alışveriş'],
     ["yarın sabah 8'de annemi ara, akşam 7'de ilaç al", ''],
     ['ekmek al bir de süt al', ''],
+    // ---- "diye" ile bağlı cümle ve "küsur" (ses tanıma virgül koyabilir)
+    ['Hava soğuk, ceketini giy diye yarın 21.00 küsüre hatırlatıcı ayarla',
+      'ALARM[11-20 21:00] "Hava soğuk ceketini giy"'],
+    ['Hava soğuk ceketini giy diye yarın 21.00 küsüre hatırlatıcı ayarla',
+      'ALARM[11-20 21:00] "Hava soğuk ceketini giy"'],
+    ['Hava soğuk ceketini giy diye yarın 21.00 küsure hatırlatıcı ayarla',
+      'ALARM[11-20 21:00] "Hava soğuk ceketini giy"'],
+    ['yarın dokuz küsüre ilaç içmemi hatırlat', ''],
+    ["süt al, yarın 9'da bankaya git", ''],
     // ---- sade not (saat yok)
     ['toptancı Ahmet 3200 lira borç', 'NOT[-] "Toptancı Ahmet 3200 lira borç" kat=Gider tutar=3.200 ₺'],
     ['beş bin lira kira öde', ''],
