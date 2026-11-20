@@ -2015,6 +2015,8 @@ class _AnaSayfaState extends State<AnaSayfa>
     setState(() => notlar = l);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: const Text('Yapıldı'),
+      duration: const Duration(seconds: 4),
+      persist: false,
       action: SnackBarAction(
         label: 'Geri al',
         onPressed: () => _notBitir(n, false),
@@ -3205,9 +3207,22 @@ class _AnaSayfaState extends State<AnaSayfa>
         ),
         child: SafeArea(
           bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 170),
-            children: govde,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: (d) {
+              final v = d.primaryVelocity ?? 0;
+              if (v > 300 && _sekme == 0) {
+                HapticFeedback.selectionClick();
+                setState(() => _sekme = 1);
+              } else if (v < -300 && _sekme == 1) {
+                HapticFeedback.selectionClick();
+                setState(() => _sekme = 0);
+              }
+            },
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 170),
+              children: govde,
+            ),
           ),
         ),
       ),
