@@ -3211,10 +3211,10 @@ class _AnaSayfaState extends State<AnaSayfa>
             behavior: HitTestBehavior.translucent,
             onHorizontalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
-              if (v > 300 && _sekme == 0) {
+              if (v < -300 && _sekme == 0) {
                 HapticFeedback.selectionClick();
                 setState(() => _sekme = 1);
-              } else if (v < -300 && _sekme == 1) {
+              } else if (v > 300 && _sekme == 1) {
                 HapticFeedback.selectionClick();
                 setState(() => _sekme = 0);
               }
