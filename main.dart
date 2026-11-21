@@ -140,6 +140,13 @@ class Store {
     await p.setString(_k, jsonEncode(l.map((e) => e.toJson()).toList()));
   }
 
+  /// Yedekten gelen kayıtların numaraları çakışmasın diye sayacı yükseltir
+  static Future<void> sayacEnAz(int n) async {
+    final p = await SharedPreferences.getInstance();
+    await p.reload();
+    if ((p.getInt(_kc) ?? 0) < n) await p.setInt(_kc, n);
+  }
+
   static Future<int> nextId() async {
     final p = await SharedPreferences.getInstance();
     await p.reload();
@@ -219,6 +226,41 @@ class NotStore {
     try {
       await const MethodChannel('hatirlatici/hizli').invokeMethod('widgetYenile');
     } catch (_) {}
+  }
+}
+
+// ---------------------------------------------------------------- yedek
+
+class _Yedek {
+  final List<Hat> hat;
+  final List<Not> not;
+  _Yedek(this.hat, this.not);
+}
+
+String yedekMetni(List<Hat> h, List<Not> n) =>
+    const JsonEncoder.withIndent(' ').convert({
+      'app': 'hatirlatici',
+      'v': 1,
+      'hatirlaticilar': h.map((e) => e.toJson()).toList(),
+      'notlar': n.map((e) => e.toJson()).toList(),
+    });
+
+_Yedek? yedekCoz(String metin) {
+  try {
+    final a = metin.indexOf('{');
+    final b = metin.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    final m = jsonDecode(metin.substring(a, b + 1)) as Map;
+    if (m['app'] != 'hatirlatici') return null;
+    final h = (m['hatirlaticilar'] as List)
+        .map((e) => Hat.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final n = (m['notlar'] as List)
+        .map((e) => Not.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    return _Yedek(h, n);
+  } catch (_) {
+    return null;
   }
 }
 
@@ -2264,6 +2306,95 @@ class _AnaSayfaState extends State<AnaSayfa>
     ));
   }
 
+  void _yedekAc() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_all_outlined),
+              title: const Text('Yedeği kopyala'),
+              subtitle: const Text(
+                  'Hatırlatma ve notlar kopyalanır. WhatsApp\'ta kendine ya da bir not uygulamasına yapıştır.'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _yedekKopyala();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.restore_outlined),
+              title: const Text('Yedeği panodan geri yükle'),
+              subtitle:
+                  const Text('Önce yedek metnini kopyala, sonra buna dokun.'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _yedekGeriYukle();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _yedekKopyala() async {
+    await Clipboard.setData(ClipboardData(text: yedekMetni(items, notlar)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            'Yedek kopyalandı (${items.length} hatırlatma, ${notlar.length} not). Şimdi yapıştırıp kendine gönder.')));
+  }
+
+  Future<void> _yedekGeriYukle() async {
+    final pano = await Clipboard.getData('text/plain');
+    final y = yedekCoz(pano?.text ?? '');
+    if (!mounted) return;
+    if (y == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Panoda geçerli bir yedek yok. Önce yedek metnini kopyala.')));
+      return;
+    }
+    final onay = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Yedek geri yüklensin mi?'),
+        content: Text(
+            'Şu anki hatırlatma ve notların silinip yedekteki ${y.hat.length} hatırlatma ve ${y.not.length} not yüklenecek.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Vazgeç')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Geri yükle')),
+        ],
+      ),
+    );
+    if (onay != true) return;
+    for (final h in items) {
+      try {
+        await iptalHat(h.id);
+      } catch (_) {}
+    }
+    var enBuyuk = 0;
+    for (final h in y.hat) {
+      if (h.id > enBuyuk) enBuyuk = h.id;
+    }
+    for (final n in y.not) {
+      if (n.id > enBuyuk) enBuyuk = n.id;
+    }
+    await Store.sayacEnAz(enBuyuk);
+    await Store.save(y.hat);
+    await NotStore.save(y.not);
+    await hepsiniYenidenKur(y.hat);
+    await _yukle();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Yedek geri yüklendi.')));
+  }
+
   void _kurulumAc() {
     showModalBottomSheet<void>(
       context: context,
@@ -2505,6 +2636,23 @@ class _AnaSayfaState extends State<AnaSayfa>
                   ),
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6, right: 8),
+            child: GestureDetector(
+              onTap: _yedekAc,
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: kYuzey,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF2B2F3A)),
+                ),
+                child: const Icon(Icons.cloud_upload_outlined,
+                    color: Colors.white, size: 22),
+              ),
             ),
           ),
           Padding(
